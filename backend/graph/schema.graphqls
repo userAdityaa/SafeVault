@@ -1,0 +1,36 @@
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+input SignupInput {
+  email: String!
+  password: String!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input GoogleLoginInput {
+  idToken: String!
+}
+
+type Mutation {
+  signup(input: SignupInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  googleLogin(input: GoogleLoginInput!): AuthPayload!
+}
+
+type User {
+  id: ID!
+  email: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Query {
+  # Just a placeholder so the schema is valid
+  _health: String!
+}
