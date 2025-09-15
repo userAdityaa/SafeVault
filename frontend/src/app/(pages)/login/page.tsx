@@ -1,0 +1,211 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { loginSchema } from "@/schema/auth";
+import { toast, Toaster } from "sonner";
+import { GoogleLogin } from "@react-oauth/google";
+
+export default function Login() {
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const router = useRouter();
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value.trim() }); // Trim input to avoid whitespace
+    setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const result = loginSchema.safeParse(form);
+    if (!result.success) {
+      const fieldErrors: any = {};
+      result.error.issues.forEach((err) => {
+        fieldErrors[err.path[0]] = err.message;
+        toast.error(err.message, { description: `Error in ${err.path} field` });
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setErrors({});
+
+    const mutation = `
+      mutation Login($input: LoginInput!) {
+        login(input: $input) {
+          token
+          user {
+            id
+            email
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await fetch("http://localhost:8080/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: mutation,
+          variables: { input: form },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.errors && result.errors.length > 0) {
+        const errorMessage = String(result.errors[0].message)
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        toast.error(errorMessage, { description: "Login failed" });
+        return;
+      }
+
+      localStorage.setItem("token", result.data.login.token);
+      localStorage.setItem("user", JSON.stringify(result.data.login.user));
+
+      setForm({ email: "", password: "" });
+
+      toast.success("Logged in successfully!", {
+        description: "Redirecting to dashboard...",
+      });
+
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+    } catch (err) {
+      toast.error("An error occurred while logging in. Please try again.", {
+        description: "Network or server error",
+      });
+    }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    try {
+      const idToken = credentialResponse.credential;
+      if (!idToken) {
+        toast.error("Google login failed", { description: "No credential received" });
+        return;
+      }
+
+      const mutation = `
+        mutation GoogleLogin($input: GoogleLoginInput!) { 
+          googleLogin(input: $input) {
+            token
+            user {
+              id
+              email
+            }
+          }
+        }
+      `;
+
+      const res = await fetch("http://localhost:8080/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: mutation,
+          variables: { input: { idToken: idToken } },
+        }),
+      });
+
+      const result = await res.json();
+
+      if (result.errors && result.errors.length > 0) {
+        toast.error("Google login failed", { description: result.errors[0].message });
+        return;
+      }
+
+      localStorage.setItem("token", result.data.googleLogin.token);
+      localStorage.setItem("user", JSON.stringify(result.data.googleLogin.user));
+
+      toast.success("Logged in with Google!", {
+        description: "Redirecting to dashboard...",
+      });
+
+      router.push("/dashboard");
+    } catch (err) {
+      toast.error("Google login error", { description: "Network or server error" });
+    }
+  };
+
+  return (
+    <div className="flex h-screen">
+      <Toaster richColors position="top-right" />
+
+      {/* Left Section with Login Form */}
+      <div className="flex-1 p-12 flex flex-col justify-center items-center">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold mb-6">Log In</h2>
+          <form className="flex flex-col w-80" onSubmit={handleSubmit}>
+            <label className="mb-2 text-left">
+              Email address <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="Enter email address"
+              className="mb-1 p-2 border rounded"
+            />
+            {errors.email && <p className="text-red-600 mb-2 text-sm text-left">{errors.email}</p>}
+
+            <label className="mb-2 text-left">
+              Password <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="password"
+              name="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder="Enter password"
+              className="mb-1 p-2 border rounded"
+            />
+            {errors.password && (
+              <p className="text-red-600 mb-2 text-sm text-left">{errors.password}</p>
+            )}
+
+            <a href="#" className="text-blue-500 no-underline mb-2">
+              Forgot password?
+            </a>
+            <button
+              type="submit"
+              className="bg-blue-500 text-white p-2 rounded mt-5 hover:bg-blue-600 w-full"
+            >
+              Sign In
+            </button>
+          </form>
+
+          <p className="mt-4">
+            Don't have an account?{" "}
+            <a href="/signup" className="text-blue-500">
+              Create one
+            </a>
+          </p>
+
+          <div className="my-4 flex items-center">
+            <div className="flex-1 border-t border-gray-300"></div>
+            <span className="mx-4 text-gray-500">or</span>
+            <div className="flex-1 border-t border-gray-300"></div>
+          </div>
+
+          {/* Google Sign In */}
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={() => toast.error("Google Sign In Failed")}
+            useOneTap
+          />
+        </div>
+      </div>
+
+      {/* Right Section with Texture */}
+      <div className="flex-1 bg-[url('/login_texture.png')] bg-cover" />
+    </div>
+  );
+}
