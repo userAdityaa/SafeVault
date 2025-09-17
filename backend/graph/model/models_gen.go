@@ -2,9 +2,23 @@
 
 package model
 
+import (
+	"github.com/99designs/gqlgen/graphql"
+)
+
 type AuthPayload struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
+}
+
+type File struct {
+	ID           string `json:"id"`
+	Hash         string `json:"hash"`
+	OriginalName string `json:"originalName"`
+	MimeType     string `json:"mimeType"`
+	Size         int    `json:"size"`
+	Visibility   string `json:"visibility"`
+	CreatedAt    string `json:"createdAt"`
 }
 
 type GoogleLoginInput struct {
@@ -27,9 +41,27 @@ type SignupInput struct {
 	Password string `json:"password"`
 }
 
+type StorageUsage struct {
+	UsedBytes   int     `json:"usedBytes"`
+	QuotaBytes  int     `json:"quotaBytes"`
+	PercentUsed float64 `json:"percentUsed"`
+}
+
+type UploadFileInput struct {
+	Files []*graphql.Upload `json:"files"`
+}
+
 type User struct {
 	ID        string `json:"id"`
 	Email     string `json:"email"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
+}
+
+type UserFile struct {
+	ID         string `json:"id"`
+	UserID     string `json:"userId"`
+	FileID     string `json:"fileId"`
+	UploadedAt string `json:"uploadedAt"`
+	File       *File  `json:"file"`
 }

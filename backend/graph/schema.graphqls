@@ -1,3 +1,5 @@
+scalar Upload
+
 type AuthPayload {
   token: String!
   user: User!
@@ -13,6 +15,28 @@ input LoginInput {
   password: String!
 }
 
+type File {
+  id: ID!
+  hash: String!
+  originalName: String!
+  mimeType: String!
+  size: Int!
+  visibility: String!
+  createdAt: String!
+}
+
+type UserFile {
+  id: ID!
+  userId: ID!
+  fileId: ID!
+  uploadedAt: String!
+  file: File!
+}
+
+input UploadFileInput {
+  files: [Upload!]!
+}
+
 input GoogleLoginInput {
   idToken: String!
 }
@@ -21,6 +45,8 @@ type Mutation {
   signup(input: SignupInput!): AuthPayload!
   login(input: LoginInput!): AuthPayload!
   googleLogin(input: GoogleLoginInput!): AuthPayload!
+
+  uploadFiles(input: UploadFileInput!): [UserFile!]!
 }
 
 type User {
@@ -33,4 +59,14 @@ type User {
 type Query {
   # Just a placeholder so the schema is valid
   _health: String!
+  myFiles: [UserFile!]!
+  myStorage: StorageUsage!
+  findMyFileByHash(hash: String!): UserFile
+  fileURL(fileId: ID!, inline: Boolean): String!
+}
+
+type StorageUsage {
+  usedBytes: Int!
+  quotaBytes: Int!
+  percentUsed: Float!
 }
