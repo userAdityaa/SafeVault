@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/useradityaa/internal/auth"
@@ -20,28 +19,35 @@ func (s *GoogleService) LoginWithGoogle(ctx context.Context, idToken string) (*m
 		return nil, "", err
 	}
 
-	email := payload.Claims["email"].(string)
+	email, _ := payload.Claims["email"].(string)
+	name, _ := payload.Claims["name"].(string)
+	picture, _ := payload.Claims["picture"].(string)
 
 	user, err := s.UserRepo.FindByGoogleMail(ctx, email)
 	if err != nil {
 		newUser := &models.GoogleUser{
 			ID:    uuid.New(),
 			Email: email,
+			Name: name,
+			Picture: picture,
 		}
 		if err := s.UserRepo.CreateGoogleUser(ctx, newUser); err != nil {
 			return nil, "", err
 		}
 		user = newUser
+	} else {
+		// Update profile if changed or empty
+		if user.Name != name || user.Picture != picture {
+			_ = s.UserRepo.UpdateGoogleUserProfile(ctx, email, name, picture)
+			user.Name = name
+			user.Picture = picture
+		}
 	}
-
-	fmt.Println("This is the user: ", user)
 
 	token, err := auth.GenerateJWT(user.ID.String())
 	if err != nil {
 		return nil, "", err
 	}
-
-	fmt.Println("This is the token: ", token)
 
 	return user, token, nil
 }
