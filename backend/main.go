@@ -12,6 +12,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/cors"
@@ -34,6 +35,11 @@ func main() {
 	// Run SQL migrations from ./migrations on startup
 	if err := runMigrations(db); err != nil {
 		log.Fatalf("migration error: %v", err)
+	}
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("No .env file found, using system environment")
 	}
 
 	// Read port from env
