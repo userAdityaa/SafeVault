@@ -2,6 +2,9 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,6 +37,7 @@ type FileRepository interface {
 	GetUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) (*models.UserFile, error)
 	SoftDeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
 	DeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
+	SearchUserFiles(ctx context.Context, userID uuid.UUID, filter SearchFilter, page Page) (items []models.UserFile, nextCursor *string, total int, err error)
 }
 
 type fileRepository struct {
@@ -42,6 +46,23 @@ type fileRepository struct {
 
 func NewFileRepository(db *pgxpool.Pool) FileRepository {
 	return &fileRepository{DB: db}
+}
+
+// Search filters and pagination
+type SearchFilter struct {
+	Filename      *string
+	MimeTypes     []string
+	SizeMin       *int64
+	SizeMax       *int64
+	CreatedAfter  *time.Time
+	CreatedBefore *time.Time
+	Tags          []string
+	UploaderName  *string
+}
+
+type Page struct {
+	Limit  int
+	Cursor *string
 }
 
 // Find file by hash
@@ -359,6 +380,163 @@ func (r *fileRepository) SoftDeleteUserFileByMappingID(ctx context.Context, user
 func (r *fileRepository) DeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error {
 	_, err := r.DB.Exec(ctx, `DELETE FROM user_files WHERE id=$1 AND user_id=$2`, mappingID, userID)
 	return err
+}
+
+// SearchUserFiles implements combined filters with keyset pagination by (uploaded_at,id)
+func (r *fileRepository) SearchUserFiles(ctx context.Context, userID uuid.UUID, filter SearchFilter, page Page) ([]models.UserFile, *string, int, error) {
+	// Base query selects active mappings for the user
+	sb := strings.Builder{}
+	countSB := strings.Builder{}
+	args := []interface{}{userID}
+	arg := func(v interface{}) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+	// Filtering CTEs and joins
+	baseCTE := `WITH base AS (
+		SELECT uf.id AS mapping_id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at
+		FROM user_files uf
+		WHERE uf.user_id = $1 AND uf.deleted_at IS NULL
+    )`
+	joinSQL := `
+    SELECT b.mapping_id, b.user_id, b.file_id, b.role, b.uploaded_at,
+		   f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
+		   COALESCE(u.email, gu.email, '') AS uploader_email,
+		   NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
+		   NULLIF(COALESCE(gu.picture, ''), '') AS uploader_picture
+	FROM base b
+	JOIN files f ON f.id = b.file_id
+	LEFT JOIN users u ON b.user_id = u.id
+    LEFT JOIN google_users gu ON b.user_id = gu.id`
+	sb.WriteString(baseCTE)
+	sb.WriteString(joinSQL)
+	countSB.WriteString(baseCTE)
+	countSB.WriteString(strings.Replace(joinSQL, `SELECT b.mapping_id, b.user_id, b.file_id, b.role, b.uploaded_at,
+	    f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
+	    COALESCE(u.email, gu.email, '') AS uploader_email,
+	    NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
+	    NULLIF(COALESCE(gu.picture, ''), '') AS uploader_picture`, "SELECT 1", 1))
+
+	// Dynamic WHERE filters
+	where := []string{}
+	if filter.Filename != nil && *filter.Filename != "" {
+		where = append(where, fmt.Sprintf("f.original_name ILIKE '%%' || %s || '%%'", arg(*filter.Filename)))
+	}
+	if len(filter.MimeTypes) > 0 {
+		where = append(where, fmt.Sprintf("f.mime_type = ANY(%s)", arg(filter.MimeTypes)))
+	}
+	if filter.SizeMin != nil {
+		where = append(where, fmt.Sprintf("f.size >= %s", arg(*filter.SizeMin)))
+	}
+	if filter.SizeMax != nil {
+		where = append(where, fmt.Sprintf("f.size <= %s", arg(*filter.SizeMax)))
+	}
+	if filter.CreatedAfter != nil {
+		where = append(where, fmt.Sprintf("f.created_at >= %s", arg(*filter.CreatedAfter)))
+	}
+	if filter.CreatedBefore != nil {
+		where = append(where, fmt.Sprintf("f.created_at <= %s", arg(*filter.CreatedBefore)))
+	}
+	if len(filter.Tags) > 0 {
+		// Require all provided tags to be present on file (intersection via HAVING count)
+		joinTags := `
+		JOIN (
+			SELECT ft.file_id
+			FROM file_tags ft
+			JOIN tags t ON t.id = ft.tag_id
+			WHERE t.name = ANY(` + arg(filter.Tags) + `)
+			GROUP BY ft.file_id
+			HAVING COUNT(DISTINCT t.name) = ` + fmt.Sprintf("%d", len(filter.Tags)) + `
+		) tagf ON tagf.file_id = b.file_id`
+		sb.WriteString(joinTags)
+		countSB.WriteString(joinTags)
+	}
+	if filter.UploaderName != nil && *filter.UploaderName != "" {
+		where = append(where, fmt.Sprintf("(gu.name ILIKE '%%' || %s || '%%')", arg(*filter.UploaderName)))
+	}
+
+	if len(where) > 0 {
+		whereSQL := "\nWHERE " + strings.Join(where, " AND ")
+		sb.WriteString(whereSQL)
+		countSB.WriteString(whereSQL)
+	}
+
+	// Keyset pagination
+	// Cursor format: uploaded_at RFC3339NANO + ":" + mapping_id
+	if page.Cursor != nil && *page.Cursor != "" {
+		var ts time.Time
+		var mid uuid.UUID
+		// Expect format "<unix_nano>:<uuid>" for stability
+		parts := strings.SplitN(*page.Cursor, ":", 2)
+		if len(parts) == 2 {
+			if ns, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+				ts = time.Unix(0, ns)
+			}
+			if id, err := uuid.Parse(parts[1]); err == nil {
+				mid = id
+			}
+		}
+		if !ts.IsZero() && mid != uuid.Nil {
+			where2 := ""
+			if len(where) > 0 {
+				where2 = " AND "
+			}
+			sb.WriteString(where2 + fmt.Sprintf("(b.uploaded_at, b.mapping_id) < (%s, %s)", arg(ts), arg(mid)))
+		}
+	}
+
+	sb.WriteString("\nORDER BY b.uploaded_at DESC, b.mapping_id DESC")
+	limit := 50
+	if page.Limit > 0 && page.Limit <= 200 {
+		limit = page.Limit
+	}
+	sb.WriteString("\nLIMIT " + fmt.Sprintf("%d", limit+1))
+
+	// Total count (without pagination) for UI; keep approximate by separate query for performance
+	// Note: count respects same filters but without LIMIT/OFFSET
+	countSQL := countSB.String()
+	countSQL = countSQL + "\nSELECT COUNT(*) FROM (" + strings.Replace(countSB.String(), "SELECT 1", "SELECT 1", 1) + ") _x"
+
+	// Run main query
+	rows, err := r.DB.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer rows.Close()
+
+	out := []models.UserFile{}
+	var lastUploaded time.Time
+	var lastID uuid.UUID
+	for rows.Next() {
+		var uf models.UserFile
+		var f models.File
+		if err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+			&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
+			&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
+			return nil, nil, 0, err
+		}
+		uf.File = f
+		out = append(out, uf)
+		lastUploaded = uf.UploadedAt
+		lastID = uf.ID
+	}
+
+	var nextCursor *string
+	if len(out) > limit {
+		// trim extra and set cursor
+		out = out[:limit]
+		cursor := fmt.Sprintf("%d:%s", lastUploaded.UnixNano(), lastID.String())
+		nextCursor = &cursor
+	}
+
+	// Get total count
+	var total int
+	if err := r.DB.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+		// If count fails, degrade gracefully
+		total = 0
+	}
+
+	return out, nextCursor, total, nil
 }
 
 // GetUserFileMappingStatus returns one of: "none", "active", "deleted"

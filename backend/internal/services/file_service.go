@@ -369,3 +369,11 @@ func (s *FileService) GetDeletedUserFiles(ctx context.Context, userID uuid.UUID)
 	}
 	return s.FileRepo.GetDeletedUserFiles(ctx, userID)
 }
+
+// SearchUserFiles wraps repository search
+func (s *FileService) SearchUserFiles(ctx context.Context, userID uuid.UUID, filter repository.SearchFilter, page repository.Page) ([]models.UserFile, *string, int, error) {
+	if s == nil || s.FileRepo == nil {
+		return nil, nil, 0, fmt.Errorf("file service not configured")
+	}
+	return s.FileRepo.SearchUserFiles(ctx, userID, filter, page)
+}
