@@ -72,6 +72,11 @@ type ComplexityRoot struct {
 		UploadFiles func(childComplexity int, input model.UploadFileInput) int
 	}
 
+	PageInfo struct {
+		EndCursor   func(childComplexity int) int
+		HasNextPage func(childComplexity int) int
+	}
+
 	Query struct {
 		FileURL          func(childComplexity int, fileID string, inline *bool) int
 		FindMyFileByHash func(childComplexity int, hash string) int
@@ -79,6 +84,7 @@ type ComplexityRoot struct {
 		MyDeletedFiles   func(childComplexity int) int
 		MyFiles          func(childComplexity int) int
 		MyStorage        func(childComplexity int) int
+		SearchMyFiles    func(childComplexity int, filter model.FileSearchFilter, pagination *model.PageInput) int
 	}
 
 	StorageUsage struct {
@@ -112,6 +118,17 @@ type ComplexityRoot struct {
 		Uploader   func(childComplexity int) int
 		UserID     func(childComplexity int) int
 	}
+
+	UserFileConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	UserFileEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
 }
 
 type MutationResolver interface {
@@ -129,6 +146,7 @@ type QueryResolver interface {
 	MyStorage(ctx context.Context) (*model.StorageUsage, error)
 	FindMyFileByHash(ctx context.Context, hash string) (*model.UserFile, error)
 	FileURL(ctx context.Context, fileID string, inline *bool) (string, error)
+	SearchMyFiles(ctx context.Context, filter model.FileSearchFilter, pagination *model.PageInput) (*model.UserFileConnection, error)
 }
 
 type executableSchema struct {
@@ -279,6 +297,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Mutation.UploadFiles(childComplexity, args["input"].(model.UploadFileInput)), true
 
+	case "PageInfo.endCursor":
+		if e.complexity.PageInfo.EndCursor == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.EndCursor(childComplexity), true
+	case "PageInfo.hasNextPage":
+		if e.complexity.PageInfo.HasNextPage == nil {
+			break
+		}
+
+		return e.complexity.PageInfo.HasNextPage(childComplexity), true
+
 	case "Query.fileURL":
 		if e.complexity.Query.FileURL == nil {
 			break
@@ -325,6 +356,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyStorage(childComplexity), true
+	case "Query.searchMyFiles":
+		if e.complexity.Query.SearchMyFiles == nil {
+			break
+		}
+
+		args, err := ec.field_Query_searchMyFiles_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.SearchMyFiles(childComplexity, args["filter"].(model.FileSearchFilter), args["pagination"].(*model.PageInput)), true
 
 	case "StorageUsage.percentUsed":
 		if e.complexity.StorageUsage.PercentUsed == nil {
@@ -450,6 +492,38 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.UserFile.UserID(childComplexity), true
 
+	case "UserFileConnection.edges":
+		if e.complexity.UserFileConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.UserFileConnection.Edges(childComplexity), true
+	case "UserFileConnection.pageInfo":
+		if e.complexity.UserFileConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.UserFileConnection.PageInfo(childComplexity), true
+	case "UserFileConnection.totalCount":
+		if e.complexity.UserFileConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.UserFileConnection.TotalCount(childComplexity), true
+
+	case "UserFileEdge.cursor":
+		if e.complexity.UserFileEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.UserFileEdge.Cursor(childComplexity), true
+	case "UserFileEdge.node":
+		if e.complexity.UserFileEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.UserFileEdge.Node(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -458,8 +532,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := executionContext{opCtx, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputFileSearchFilter,
 		ec.unmarshalInputGoogleLoginInput,
 		ec.unmarshalInputLoginInput,
+		ec.unmarshalInputPageInput,
 		ec.unmarshalInputSignupInput,
 		ec.unmarshalInputUploadFileInput,
 	)
@@ -679,6 +755,22 @@ func (ec *executionContext) field_Query_findMyFileByHash_args(ctx context.Contex
 		return nil, err
 	}
 	args["hash"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_searchMyFiles_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "filter", ec.unmarshalNFileSearchFilter2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileSearchFilter)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "pagination", ec.unmarshalOPageInput2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPageInput)
+	if err != nil {
+		return nil, err
+	}
+	args["pagination"] = arg1
 	return args, nil
 }
 
@@ -1316,6 +1408,64 @@ func (ec *executionContext) fieldContext_Mutation_purgeFile(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_endCursor,
+		func(ctx context.Context) (any, error) {
+			return obj.EndCursor, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_endCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PageInfo_hasNextPage,
+		func(ctx context.Context) (any, error) {
+			return obj.HasNextPage, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query__health(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1562,6 +1712,55 @@ func (ec *executionContext) fieldContext_Query_fileURL(ctx context.Context, fiel
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_fileURL_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_searchMyFiles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_searchMyFiles,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().SearchMyFiles(ctx, fc.Args["filter"].(model.FileSearchFilter), fc.Args["pagination"].(*model.PageInput))
+		},
+		nil,
+		ec.marshalNUserFileConnection2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileConnection,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_searchMyFiles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "edges":
+				return ec.fieldContext_UserFileConnection_edges(ctx, field)
+			case "pageInfo":
+				return ec.fieldContext_UserFileConnection_pageInfo(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_UserFileConnection_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserFileConnection", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_searchMyFiles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2277,6 +2476,177 @@ func (ec *executionContext) fieldContext_UserFile_uploader(_ context.Context, fi
 				return ec.fieldContext_Uploader_picture(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Uploader", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFileConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.UserFileConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFileConnection_edges,
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		ec.marshalNUserFileEdge2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileEdgeᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFileConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFileConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cursor":
+				return ec.fieldContext_UserFileEdge_cursor(ctx, field)
+			case "node":
+				return ec.fieldContext_UserFileEdge_node(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserFileEdge", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFileConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.UserFileConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFileConnection_pageInfo,
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		ec.marshalNPageInfo2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPageInfo,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFileConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFileConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "endCursor":
+				return ec.fieldContext_PageInfo_endCursor(ctx, field)
+			case "hasNextPage":
+				return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFileConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.UserFileConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFileConnection_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFileConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFileConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFileEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.UserFileEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFileEdge_cursor,
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFileEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFileEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFileEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.UserFileEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFileEdge_node,
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		ec.marshalNUserFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFileEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFileEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_UserFile_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_UserFile_userId(ctx, field)
+			case "fileId":
+				return ec.fieldContext_UserFile_fileId(ctx, field)
+			case "uploadedAt":
+				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
+			case "file":
+				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
 		},
 	}
 	return fc, nil
@@ -3728,6 +4098,82 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputFileSearchFilter(ctx context.Context, obj any) (model.FileSearchFilter, error) {
+	var it model.FileSearchFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"filename", "mimeTypes", "sizeMin", "sizeMax", "createdAfter", "createdBefore", "tags", "uploaderName"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "filename":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filename"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filename = data
+		case "mimeTypes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mimeTypes"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MimeTypes = data
+		case "sizeMin":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sizeMin"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SizeMin = data
+		case "sizeMax":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sizeMax"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SizeMax = data
+		case "createdAfter":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdAfter"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CreatedAfter = data
+		case "createdBefore":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("createdBefore"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.CreatedBefore = data
+		case "tags":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tags"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tags = data
+		case "uploaderName":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("uploaderName"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.UploaderName = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputGoogleLoginInput(ctx context.Context, obj any) (model.GoogleLoginInput, error) {
 	var it model.GoogleLoginInput
 	asMap := map[string]any{}
@@ -3783,6 +4229,40 @@ func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj an
 				return it, err
 			}
 			it.Password = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputPageInput(ctx context.Context, obj any) (model.PageInput, error) {
+	var it model.PageInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"limit", "cursor"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "cursor":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cursor"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Cursor = data
 		}
 	}
 
@@ -4067,6 +4547,47 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 	return out
 }
 
+var pageInfoImplementors = []string{"PageInfo"}
+
+func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *model.PageInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, pageInfoImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PageInfo")
+		case "endCursor":
+			out.Values[i] = ec._PageInfo_endCursor(ctx, field, obj)
+		case "hasNextPage":
+			out.Values[i] = ec._PageInfo_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -4203,6 +4724,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_fileURL(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "searchMyFiles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_searchMyFiles(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -4444,6 +4987,99 @@ func (ec *executionContext) _UserFile(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "uploader":
 			out.Values[i] = ec._UserFile_uploader(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userFileConnectionImplementors = []string{"UserFileConnection"}
+
+func (ec *executionContext) _UserFileConnection(ctx context.Context, sel ast.SelectionSet, obj *model.UserFileConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userFileConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserFileConnection")
+		case "edges":
+			out.Values[i] = ec._UserFileConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._UserFileConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._UserFileConnection_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var userFileEdgeImplementors = []string{"UserFileEdge"}
+
+func (ec *executionContext) _UserFileEdge(ctx context.Context, sel ast.SelectionSet, obj *model.UserFileEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userFileEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserFileEdge")
+		case "cursor":
+			out.Values[i] = ec._UserFileEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._UserFileEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4842,6 +5478,11 @@ func (ec *executionContext) marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraph�
 	return ec._File(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNFileSearchFilter2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileSearchFilter(ctx context.Context, v any) (model.FileSearchFilter, error) {
+	res, err := ec.unmarshalInputFileSearchFilter(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -4898,6 +5539,16 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐLoginInput(ctx context.Context, v any) (model.LoginInput, error) {
 	res, err := ec.unmarshalInputLoginInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PageInfo(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNSignupInput2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐSignupInput(ctx context.Context, v any) (model.SignupInput, error) {
@@ -5054,6 +5705,74 @@ func (ec *executionContext) marshalNUserFile2ᚖgithubᚗcomᚋuseradityaaᚋgra
 		return graphql.Null
 	}
 	return ec._UserFile(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserFileConnection2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileConnection(ctx context.Context, sel ast.SelectionSet, v model.UserFileConnection) graphql.Marshaler {
+	return ec._UserFileConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUserFileConnection2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileConnection(ctx context.Context, sel ast.SelectionSet, v *model.UserFileConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserFileConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNUserFileEdge2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.UserFileEdge) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNUserFileEdge2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileEdge(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNUserFileEdge2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileEdge(ctx context.Context, sel ast.SelectionSet, v *model.UserFileEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._UserFileEdge(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -5337,6 +6056,68 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOPageInput2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPageInput(ctx context.Context, v any) (*model.PageInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputPageInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

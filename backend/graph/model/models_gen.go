@@ -22,6 +22,17 @@ type File struct {
 	CreatedAt    string `json:"createdAt"`
 }
 
+type FileSearchFilter struct {
+	Filename      *string  `json:"filename,omitempty"`
+	MimeTypes     []string `json:"mimeTypes,omitempty"`
+	SizeMin       *int     `json:"sizeMin,omitempty"`
+	SizeMax       *int     `json:"sizeMax,omitempty"`
+	CreatedAfter  *string  `json:"createdAfter,omitempty"`
+	CreatedBefore *string  `json:"createdBefore,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	UploaderName  *string  `json:"uploaderName,omitempty"`
+}
+
 type GoogleLoginInput struct {
 	IDToken string `json:"idToken"`
 }
@@ -32,6 +43,16 @@ type LoginInput struct {
 }
 
 type Mutation struct {
+}
+
+type PageInfo struct {
+	EndCursor   *string `json:"endCursor,omitempty"`
+	HasNextPage bool    `json:"hasNextPage"`
+}
+
+type PageInput struct {
+	Limit  *int    `json:"limit,omitempty"`
+	Cursor *string `json:"cursor,omitempty"`
 }
 
 type Query struct {
@@ -78,4 +99,15 @@ type UserFile struct {
 	UploadedAt string    `json:"uploadedAt"`
 	File       *File     `json:"file"`
 	Uploader   *Uploader `json:"uploader,omitempty"`
+}
+
+type UserFileConnection struct {
+	Edges      []*UserFileEdge `json:"edges"`
+	PageInfo   *PageInfo       `json:"pageInfo"`
+	TotalCount int             `json:"totalCount"`
+}
+
+type UserFileEdge struct {
+	Cursor string    `json:"cursor"`
+	Node   *UserFile `json:"node"`
 }

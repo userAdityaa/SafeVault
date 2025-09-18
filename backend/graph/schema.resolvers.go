@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/useradityaa/graph/model"
 	"github.com/useradityaa/internal/middleware"
+	"github.com/useradityaa/internal/repository"
 )
 
 // Signup is the resolver for the signup field.
@@ -420,6 +421,113 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 		return "", fmt.Errorf("file service not configured")
 	}
 	return r.FileService.GetFileURL(ctx, userID, fid, in)
+}
+
+// SearchMyFiles is the resolver for the searchMyFiles field.
+func (r *queryResolver) SearchMyFiles(ctx context.Context, filter model.FileSearchFilter, pagination *model.PageInput) (*model.UserFileConnection, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+	if r.FileService == nil {
+		return nil, fmt.Errorf("file service not configured")
+	}
+	// Map GraphQL filter to repo filter
+	rf := repository.SearchFilter{}
+	if filter.Filename != nil && *filter.Filename != "" {
+		rf.Filename = filter.Filename
+	}
+	if len(filter.MimeTypes) > 0 {
+		rf.MimeTypes = filter.MimeTypes
+	}
+	if filter.SizeMin != nil {
+		v := int64(*filter.SizeMin)
+		rf.SizeMin = &v
+	}
+	if filter.SizeMax != nil {
+		v := int64(*filter.SizeMax)
+		rf.SizeMax = &v
+	}
+	if filter.CreatedAfter != nil && *filter.CreatedAfter != "" {
+		if t, err := time.Parse(time.RFC3339, *filter.CreatedAfter); err == nil {
+			rf.CreatedAfter = &t
+		}
+	}
+	if filter.CreatedBefore != nil && *filter.CreatedBefore != "" {
+		if t, err := time.Parse(time.RFC3339, *filter.CreatedBefore); err == nil {
+			rf.CreatedBefore = &t
+		}
+	}
+	if len(filter.Tags) > 0 {
+		rf.Tags = filter.Tags
+	}
+	if filter.UploaderName != nil && *filter.UploaderName != "" {
+		rf.UploaderName = filter.UploaderName
+	}
+
+	pg := repository.Page{Limit: 50}
+	if pagination != nil {
+		if pagination.Limit != nil {
+			pg.Limit = *pagination.Limit
+		}
+		pg.Cursor = pagination.Cursor
+	}
+
+	items, next, total, err := r.FileService.SearchUserFiles(ctx, userID, rf, pg)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := []*model.UserFileEdge{}
+	for _, uf := range items {
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picPtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picPtr = &p
+		}
+		edges = append(edges, &model.UserFileEdge{
+			Cursor: fmt.Sprintf("%d:%s", uf.UploadedAt.UnixNano(), uf.ID.String()),
+			Node: &model.UserFile{
+				ID:         uf.ID.String(),
+				UserID:     uf.UserID.String(),
+				FileID:     uf.FileID.String(),
+				UploadedAt: uf.UploadedAt.Format(time.RFC3339),
+				File: &model.File{
+					ID:           uf.File.ID.String(),
+					Hash:         uf.File.Hash,
+					OriginalName: uf.File.OriginalName,
+					MimeType:     uf.File.MimeType,
+					Size:         int(uf.File.Size),
+					RefCount:     uf.File.RefCount,
+					Visibility:   uf.File.Visibility,
+					CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+				},
+				Uploader: &model.Uploader{
+					Email:   uf.UploaderEmail,
+					Name:    namePtr,
+					Picture: picPtr,
+				},
+			},
+		})
+	}
+
+	return &model.UserFileConnection{
+		Edges: edges,
+		PageInfo: &model.PageInfo{
+			EndCursor:   next,
+			HasNextPage: next != nil,
+		},
+		TotalCount: total,
+	}, nil
 }
 
 // Mutation returns MutationResolver implementation.

@@ -80,6 +80,10 @@ type Query {
   myStorage: StorageUsage!
   findMyFileByHash(hash: String!): UserFile
   fileURL(fileId: ID!, inline: Boolean): String!
+  searchMyFiles(
+    filter: FileSearchFilter!
+    pagination: PageInput
+  ): UserFileConnection!
 }
 
 type StorageUsage {
@@ -88,4 +92,36 @@ type StorageUsage {
   percentUsed: Float!
   savingsBytes: Int!
   savingsPercent: Float!
+}
+
+input FileSearchFilter {
+  filename: String
+  mimeTypes: [String!]
+  sizeMin: Int
+  sizeMax: Int
+  createdAfter: String
+  createdBefore: String
+  tags: [String!]
+  uploaderName: String
+}
+
+input PageInput {
+  limit: Int
+  cursor: String
+}
+
+type UserFileEdge {
+  cursor: String!
+  node: UserFile!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+type UserFileConnection {
+  edges: [UserFileEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
 }
