@@ -15,7 +15,7 @@ func InitDB() *pgxpool.Pool {
 		log.Println("No .env file found, using system environment")
 	}
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv("DATABASE_URL_PROD")
 	dbpool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
