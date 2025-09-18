@@ -26,4 +26,9 @@ type UserFile struct {
 	UploadedAt time.Time `gorm:"autoCreateTime"`
 
 	File File `gorm:"foreignKey:FileID"`
+
+	// Non-persisted helper fields populated via joins for GraphQL
+	UploaderEmail   string
+	UploaderName    string
+	UploaderPicture string
 }
