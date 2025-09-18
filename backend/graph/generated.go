@@ -58,13 +58,16 @@ type ComplexityRoot struct {
 		ID           func(childComplexity int) int
 		MimeType     func(childComplexity int) int
 		OriginalName func(childComplexity int) int
+		RefCount     func(childComplexity int) int
 		Size         func(childComplexity int) int
 		Visibility   func(childComplexity int) int
 	}
 
 	Mutation struct {
+		DeleteFile  func(childComplexity int, fileID string) int
 		GoogleLogin func(childComplexity int, input model.GoogleLoginInput) int
 		Login       func(childComplexity int, input model.LoginInput) int
+		PurgeFile   func(childComplexity int, fileID string) int
 		Signup      func(childComplexity int, input model.SignupInput) int
 		UploadFiles func(childComplexity int, input model.UploadFileInput) int
 	}
@@ -73,20 +76,31 @@ type ComplexityRoot struct {
 		FileURL          func(childComplexity int, fileID string, inline *bool) int
 		FindMyFileByHash func(childComplexity int, hash string) int
 		Health           func(childComplexity int) int
+		MyDeletedFiles   func(childComplexity int) int
 		MyFiles          func(childComplexity int) int
 		MyStorage        func(childComplexity int) int
 	}
 
 	StorageUsage struct {
-		PercentUsed func(childComplexity int) int
-		QuotaBytes  func(childComplexity int) int
-		UsedBytes   func(childComplexity int) int
+		PercentUsed    func(childComplexity int) int
+		QuotaBytes     func(childComplexity int) int
+		SavingsBytes   func(childComplexity int) int
+		SavingsPercent func(childComplexity int) int
+		UsedBytes      func(childComplexity int) int
+	}
+
+	Uploader struct {
+		Email   func(childComplexity int) int
+		Name    func(childComplexity int) int
+		Picture func(childComplexity int) int
 	}
 
 	User struct {
 		CreatedAt func(childComplexity int) int
 		Email     func(childComplexity int) int
 		ID        func(childComplexity int) int
+		Name      func(childComplexity int) int
+		Picture   func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 	}
 
@@ -95,6 +109,7 @@ type ComplexityRoot struct {
 		FileID     func(childComplexity int) int
 		ID         func(childComplexity int) int
 		UploadedAt func(childComplexity int) int
+		Uploader   func(childComplexity int) int
 		UserID     func(childComplexity int) int
 	}
 }
@@ -104,10 +119,13 @@ type MutationResolver interface {
 	Login(ctx context.Context, input model.LoginInput) (*model.AuthPayload, error)
 	GoogleLogin(ctx context.Context, input model.GoogleLoginInput) (*model.AuthPayload, error)
 	UploadFiles(ctx context.Context, input model.UploadFileInput) ([]*model.UserFile, error)
+	DeleteFile(ctx context.Context, fileID string) (bool, error)
+	PurgeFile(ctx context.Context, fileID string) (bool, error)
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
 	MyFiles(ctx context.Context) ([]*model.UserFile, error)
+	MyDeletedFiles(ctx context.Context) ([]*model.UserFile, error)
 	MyStorage(ctx context.Context) (*model.StorageUsage, error)
 	FindMyFileByHash(ctx context.Context, hash string) (*model.UserFile, error)
 	FileURL(ctx context.Context, fileID string, inline *bool) (string, error)
@@ -175,6 +193,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.File.OriginalName(childComplexity), true
+	case "File.refCount":
+		if e.complexity.File.RefCount == nil {
+			break
+		}
+
+		return e.complexity.File.RefCount(childComplexity), true
 	case "File.size":
 		if e.complexity.File.Size == nil {
 			break
@@ -188,6 +212,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.File.Visibility(childComplexity), true
 
+	case "Mutation.deleteFile":
+		if e.complexity.Mutation.DeleteFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_deleteFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.DeleteFile(childComplexity, args["fileId"].(string)), true
 	case "Mutation.googleLogin":
 		if e.complexity.Mutation.GoogleLogin == nil {
 			break
@@ -210,6 +245,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Login(childComplexity, args["input"].(model.LoginInput)), true
+	case "Mutation.purgeFile":
+		if e.complexity.Mutation.PurgeFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_purgeFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.PurgeFile(childComplexity, args["fileId"].(string)), true
 	case "Mutation.signup":
 		if e.complexity.Mutation.Signup == nil {
 			break
@@ -261,6 +307,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Health(childComplexity), true
+	case "Query.myDeletedFiles":
+		if e.complexity.Query.MyDeletedFiles == nil {
+			break
+		}
+
+		return e.complexity.Query.MyDeletedFiles(childComplexity), true
 	case "Query.myFiles":
 		if e.complexity.Query.MyFiles == nil {
 			break
@@ -286,12 +338,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.StorageUsage.QuotaBytes(childComplexity), true
+	case "StorageUsage.savingsBytes":
+		if e.complexity.StorageUsage.SavingsBytes == nil {
+			break
+		}
+
+		return e.complexity.StorageUsage.SavingsBytes(childComplexity), true
+	case "StorageUsage.savingsPercent":
+		if e.complexity.StorageUsage.SavingsPercent == nil {
+			break
+		}
+
+		return e.complexity.StorageUsage.SavingsPercent(childComplexity), true
 	case "StorageUsage.usedBytes":
 		if e.complexity.StorageUsage.UsedBytes == nil {
 			break
 		}
 
 		return e.complexity.StorageUsage.UsedBytes(childComplexity), true
+
+	case "Uploader.email":
+		if e.complexity.Uploader.Email == nil {
+			break
+		}
+
+		return e.complexity.Uploader.Email(childComplexity), true
+	case "Uploader.name":
+		if e.complexity.Uploader.Name == nil {
+			break
+		}
+
+		return e.complexity.Uploader.Name(childComplexity), true
+	case "Uploader.picture":
+		if e.complexity.Uploader.Picture == nil {
+			break
+		}
+
+		return e.complexity.Uploader.Picture(childComplexity), true
 
 	case "User.createdAt":
 		if e.complexity.User.CreatedAt == nil {
@@ -311,6 +394,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.ID(childComplexity), true
+	case "User.name":
+		if e.complexity.User.Name == nil {
+			break
+		}
+
+		return e.complexity.User.Name(childComplexity), true
+	case "User.picture":
+		if e.complexity.User.Picture == nil {
+			break
+		}
+
+		return e.complexity.User.Picture(childComplexity), true
 	case "User.updatedAt":
 		if e.complexity.User.UpdatedAt == nil {
 			break
@@ -342,6 +437,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.UserFile.UploadedAt(childComplexity), true
+	case "UserFile.uploader":
+		if e.complexity.UserFile.Uploader == nil {
+			break
+		}
+
+		return e.complexity.UserFile.Uploader(childComplexity), true
 	case "UserFile.userId":
 		if e.complexity.UserFile.UserID == nil {
 			break
@@ -477,6 +578,17 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_deleteFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_googleLogin_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -496,6 +608,17 @@ func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawAr
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_purgeFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
 	return args, nil
 }
 
@@ -668,6 +791,10 @@ func (ec *executionContext) fieldContext_AuthPayload_user(_ context.Context, fie
 				return ec.fieldContext_User_id(ctx, field)
 			case "email":
 				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -812,6 +939,35 @@ func (ec *executionContext) _File_size(ctx context.Context, field graphql.Collec
 }
 
 func (ec *executionContext) fieldContext_File_size(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "File",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _File_refCount(ctx context.Context, field graphql.CollectedField, obj *model.File) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_File_refCount,
+		func(ctx context.Context) (any, error) {
+			return obj.RefCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_File_refCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "File",
 		Field:      field,
@@ -1058,6 +1214,8 @@ func (ec *executionContext) fieldContext_Mutation_uploadFiles(ctx context.Contex
 				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
 			case "file":
 				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
 		},
@@ -1070,6 +1228,88 @@ func (ec *executionContext) fieldContext_Mutation_uploadFiles(ctx context.Contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_uploadFiles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_deleteFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_deleteFile,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().DeleteFile(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_deleteFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_deleteFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_purgeFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_purgeFile,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().PurgeFile(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_purgeFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_purgeFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -1139,6 +1379,51 @@ func (ec *executionContext) fieldContext_Query_myFiles(_ context.Context, field 
 				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
 			case "file":
 				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myDeletedFiles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myDeletedFiles,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MyDeletedFiles(ctx)
+		},
+		nil,
+		ec.marshalNUserFile2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myDeletedFiles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_UserFile_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_UserFile_userId(ctx, field)
+			case "fileId":
+				return ec.fieldContext_UserFile_fileId(ctx, field)
+			case "uploadedAt":
+				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
+			case "file":
+				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
 		},
@@ -1176,6 +1461,10 @@ func (ec *executionContext) fieldContext_Query_myStorage(_ context.Context, fiel
 				return ec.fieldContext_StorageUsage_quotaBytes(ctx, field)
 			case "percentUsed":
 				return ec.fieldContext_StorageUsage_percentUsed(ctx, field)
+			case "savingsBytes":
+				return ec.fieldContext_StorageUsage_savingsBytes(ctx, field)
+			case "savingsPercent":
+				return ec.fieldContext_StorageUsage_savingsPercent(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StorageUsage", field.Name)
 		},
@@ -1218,6 +1507,8 @@ func (ec *executionContext) fieldContext_Query_findMyFileByHash(ctx context.Cont
 				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
 			case "file":
 				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
 		},
@@ -1472,6 +1763,151 @@ func (ec *executionContext) fieldContext_StorageUsage_percentUsed(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _StorageUsage_savingsBytes(ctx context.Context, field graphql.CollectedField, obj *model.StorageUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StorageUsage_savingsBytes,
+		func(ctx context.Context) (any, error) {
+			return obj.SavingsBytes, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StorageUsage_savingsBytes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StorageUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StorageUsage_savingsPercent(ctx context.Context, field graphql.CollectedField, obj *model.StorageUsage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StorageUsage_savingsPercent,
+		func(ctx context.Context) (any, error) {
+			return obj.SavingsPercent, nil
+		},
+		nil,
+		ec.marshalNFloat2float64,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StorageUsage_savingsPercent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StorageUsage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Uploader_email(ctx context.Context, field graphql.CollectedField, obj *model.Uploader) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Uploader_email,
+		func(ctx context.Context) (any, error) {
+			return obj.Email, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Uploader_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Uploader",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Uploader_name(ctx context.Context, field graphql.CollectedField, obj *model.Uploader) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Uploader_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Uploader_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Uploader",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Uploader_picture(ctx context.Context, field graphql.CollectedField, obj *model.Uploader) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Uploader_picture,
+		func(ctx context.Context) (any, error) {
+			return obj.Picture, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Uploader_picture(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Uploader",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1518,6 +1954,64 @@ func (ec *executionContext) _User_email(ctx context.Context, field graphql.Colle
 }
 
 func (ec *executionContext) fieldContext_User_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_name(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_picture(ctx context.Context, field graphql.CollectedField, obj *model.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_picture,
+		func(ctx context.Context) (any, error) {
+			return obj.Picture, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_picture(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
@@ -1738,12 +2232,51 @@ func (ec *executionContext) fieldContext_UserFile_file(_ context.Context, field 
 				return ec.fieldContext_File_mimeType(ctx, field)
 			case "size":
 				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
 			case "visibility":
 				return ec.fieldContext_File_visibility(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_File_createdAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserFile_uploader(ctx context.Context, field graphql.CollectedField, obj *model.UserFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_UserFile_uploader,
+		func(ctx context.Context) (any, error) {
+			return obj.Uploader, nil
+		},
+		nil,
+		ec.marshalOUploader2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUploader,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_UserFile_uploader(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UserFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "email":
+				return ec.fieldContext_Uploader_email(ctx, field)
+			case "name":
+				return ec.fieldContext_Uploader_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_Uploader_picture(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Uploader", field.Name)
 		},
 	}
 	return fc, nil
@@ -3297,7 +3830,7 @@ func (ec *executionContext) unmarshalInputUploadFileInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"files"}
+	fieldsInOrder := [...]string{"files", "allowDuplicate"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3311,6 +3844,13 @@ func (ec *executionContext) unmarshalInputUploadFileInput(ctx context.Context, o
 				return it, err
 			}
 			it.Files = data
+		case "allowDuplicate":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("allowDuplicate"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AllowDuplicate = data
 		}
 	}
 
@@ -3405,6 +3945,11 @@ func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "refCount":
+			out.Values[i] = ec._File_refCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "visibility":
 			out.Values[i] = ec._File_visibility(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3485,6 +4030,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "deleteFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteFile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "purgeFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_purgeFile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3559,6 +4118,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_myFiles(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myDeletedFiles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myDeletedFiles(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -3691,6 +4272,59 @@ func (ec *executionContext) _StorageUsage(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "savingsBytes":
+			out.Values[i] = ec._StorageUsage_savingsBytes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "savingsPercent":
+			out.Values[i] = ec._StorageUsage_savingsPercent(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var uploaderImplementors = []string{"Uploader"}
+
+func (ec *executionContext) _Uploader(ctx context.Context, sel ast.SelectionSet, obj *model.Uploader) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, uploaderImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Uploader")
+		case "email":
+			out.Values[i] = ec._Uploader_email(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._Uploader_name(ctx, field, obj)
+		case "picture":
+			out.Values[i] = ec._Uploader_picture(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3735,6 +4369,10 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "name":
+			out.Values[i] = ec._User_name(ctx, field, obj)
+		case "picture":
+			out.Values[i] = ec._User_picture(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._User_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -3804,6 +4442,8 @@ func (ec *executionContext) _UserFile(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "uploader":
+			out.Values[i] = ec._UserFile_uploader(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4715,6 +5355,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOUploader2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUploader(ctx context.Context, sel ast.SelectionSet, v *model.Uploader) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Uploader(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOUserFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFile(ctx context.Context, sel ast.SelectionSet, v *model.UserFile) graphql.Marshaler {

@@ -21,6 +21,7 @@ type File {
   originalName: String!
   mimeType: String!
   size: Int!
+  refCount: Int!
   visibility: String!
   createdAt: String!
 }
@@ -31,10 +32,12 @@ type UserFile {
   fileId: ID!
   uploadedAt: String!
   file: File!
+  uploader: Uploader
 }
 
 input UploadFileInput {
   files: [Upload!]!
+  allowDuplicate: Boolean
 }
 
 input GoogleLoginInput {
@@ -47,19 +50,33 @@ type Mutation {
   googleLogin(input: GoogleLoginInput!): AuthPayload!
 
   uploadFiles(input: UploadFileInput!): [UserFile!]!
+  deleteFile(fileId: ID!): Boolean!
+  purgeFile(fileId: ID!): Boolean!
 }
 
 type User {
   id: ID!
   email: String!
+  name: String
+  picture: String
   createdAt: String!
   updatedAt: String!
+}
+
+"""
+Represents the uploader of a file. Can originate from either users or google_users.
+"""
+type Uploader {
+  email: String!
+  name: String
+  picture: String
 }
 
 type Query {
   # Just a placeholder so the schema is valid
   _health: String!
   myFiles: [UserFile!]!
+  myDeletedFiles: [UserFile!]!
   myStorage: StorageUsage!
   findMyFileByHash(hash: String!): UserFile
   fileURL(fileId: ID!, inline: Boolean): String!
@@ -69,4 +86,6 @@ type StorageUsage {
   usedBytes: Int!
   quotaBytes: Int!
   percentUsed: Float!
+  savingsBytes: Int!
+  savingsPercent: Float!
 }

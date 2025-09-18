@@ -57,8 +57,10 @@ func (r *mutationResolver) GoogleLogin(ctx context.Context, input model.GoogleLo
 	return &model.AuthPayload{
 		Token: token,
 		User: &model.User{
-			ID:    user.ID.String(),
-			Email: user.Email,
+			ID:      user.ID.String(),
+			Email:   user.Email,
+			Name:    &user.Name,
+			Picture: &user.Picture,
 		},
 	}, nil
 }
@@ -88,6 +90,10 @@ func (r *mutationResolver) UploadFiles(ctx context.Context, input model.UploadFi
 		return nil, fmt.Errorf("file storage not configured")
 	}
 
+	// Pass allowDuplicate down via context for now (small change without altering service signature)
+	if input.AllowDuplicate != nil && *input.AllowDuplicate {
+		ctx = context.WithValue(ctx, struct{ key string }{"allowDuplicate"}, true)
+	}
 	userFiles, err := r.FileService.UploadFiles(ctx, userID, uploads)
 	if err != nil {
 		return nil, err
@@ -96,6 +102,17 @@ func (r *mutationResolver) UploadFiles(ctx context.Context, input model.UploadFi
 	// Map to GraphQL models
 	var gqlFiles []*model.UserFile
 	for _, uf := range userFiles {
+		// Inline pointer construction for optional fields
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picPtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picPtr = &p
+		}
 		gqlFiles = append(gqlFiles, &model.UserFile{
 			ID:         uf.ID.String(),
 			UserID:     uf.UserID.String(),
@@ -107,13 +124,65 @@ func (r *mutationResolver) UploadFiles(ctx context.Context, input model.UploadFi
 				OriginalName: uf.File.OriginalName,
 				MimeType:     uf.File.MimeType,
 				Size:         int(uf.File.Size),
+				RefCount:     uf.File.RefCount,
 				Visibility:   uf.File.Visibility,
 				CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+			},
+			Uploader: &model.Uploader{
+				Email:   uf.UploaderEmail,
+				Name:    namePtr,
+				Picture: picPtr,
 			},
 		})
 	}
 
 	return gqlFiles, nil
+}
+
+// DeleteFile is the resolver for the deleteFile field.
+func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	fid, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+	if r.FileService == nil {
+		return false, fmt.Errorf("file service not configured")
+	}
+	if err := r.FileService.SoftDeleteUserFile(ctx, userID, fid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// PurgeFile is the resolver for the purgeFile field.
+func (r *mutationResolver) PurgeFile(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	fid, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+	if r.FileService == nil {
+		return false, fmt.Errorf("file service not configured")
+	}
+	if err := r.FileService.PurgeUserFile(ctx, userID, fid); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // Health is the resolver for the _health field.
@@ -140,6 +209,17 @@ func (r *queryResolver) MyFiles(ctx context.Context) ([]*model.UserFile, error) 
 	}
 	var out []*model.UserFile
 	for _, uf := range ufs {
+		// Inline pointer construction for optional fields
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picPtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picPtr = &p
+		}
 		out = append(out, &model.UserFile{
 			ID:         uf.ID.String(),
 			UserID:     uf.UserID.String(),
@@ -151,10 +231,72 @@ func (r *queryResolver) MyFiles(ctx context.Context) ([]*model.UserFile, error) 
 				OriginalName: uf.File.OriginalName,
 				MimeType:     uf.File.MimeType,
 				Size:         int(uf.File.Size),
+				RefCount:     uf.File.RefCount,
 				Visibility:   uf.File.Visibility,
 				CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
 			},
+			Uploader: &model.Uploader{
+				Email:   uf.UploaderEmail,
+				Name:    namePtr,
+				Picture: picPtr,
+			},
 		})
+	}
+	return out, nil
+}
+
+// MyDeletedFiles is the resolver for the myDeletedFiles field.
+func (r *queryResolver) MyDeletedFiles(ctx context.Context) ([]*model.UserFile, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+	if r.FileService == nil {
+		return nil, fmt.Errorf("file service not configured")
+	}
+	ufs, err := r.FileService.GetDeletedUserFiles(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	var out []*model.UserFile
+	for _, uf := range ufs {
+		node := &model.UserFile{
+			ID:         uf.ID.String(),
+			UserID:     uf.UserID.String(),
+			FileID:     uf.FileID.String(),
+			UploadedAt: uf.UploadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           uf.File.ID.String(),
+				Hash:         uf.File.Hash,
+				OriginalName: uf.File.OriginalName,
+				MimeType:     uf.File.MimeType,
+				Size:         int(uf.File.Size),
+				RefCount:     uf.File.RefCount,
+				Visibility:   uf.File.Visibility,
+				CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+			},
+		}
+		// Inline pointer construction for optional fields
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picPtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picPtr = &p
+		}
+		node.Uploader = &model.Uploader{
+			Email:   uf.UploaderEmail,
+			Name:    namePtr,
+			Picture: picPtr,
+		}
+		out = append(out, node)
 	}
 	return out, nil
 }
@@ -176,14 +318,29 @@ func (r *queryResolver) MyStorage(ctx context.Context) (*model.StorageUsage, err
 	if err != nil {
 		return nil, err
 	}
+	// attributed physical usage (sum of size/ref_count per file)
+	attributed, err := r.FileService.GetUserAttributedUsage(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
 	percent := float64(0)
 	if quota > 0 {
 		percent = (float64(used) / float64(quota)) * 100.0
 	}
+	savings := used - attributed
+	if savings < 0 {
+		savings = 0
+	}
+	savingsPercent := float64(0)
+	if used > 0 {
+		savingsPercent = (float64(savings) / float64(used)) * 100.0
+	}
 	return &model.StorageUsage{
-		UsedBytes:   int(used),
-		QuotaBytes:  int(quota),
-		PercentUsed: percent,
+		UsedBytes:      int(used),
+		QuotaBytes:     int(quota),
+		PercentUsed:    percent,
+		SavingsBytes:   int(savings),
+		SavingsPercent: savingsPercent,
 	}, nil
 }
 
@@ -207,6 +364,17 @@ func (r *queryResolver) FindMyFileByHash(ctx context.Context, hash string) (*mod
 	if uf == nil {
 		return nil, nil
 	}
+	// Inline pointer construction for optional fields
+	var namePtr *string
+	if uf.UploaderName != "" {
+		n := uf.UploaderName
+		namePtr = &n
+	}
+	var picPtr *string
+	if uf.UploaderPicture != "" {
+		p := uf.UploaderPicture
+		picPtr = &p
+	}
 	return &model.UserFile{
 		ID:         uf.ID.String(),
 		UserID:     uf.UserID.String(),
@@ -218,8 +386,14 @@ func (r *queryResolver) FindMyFileByHash(ctx context.Context, hash string) (*mod
 			OriginalName: uf.File.OriginalName,
 			MimeType:     uf.File.MimeType,
 			Size:         int(uf.File.Size),
+			RefCount:     uf.File.RefCount,
 			Visibility:   uf.File.Visibility,
 			CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+		},
+		Uploader: &model.Uploader{
+			Email:   uf.UploaderEmail,
+			Name:    namePtr,
+			Picture: picPtr,
 		},
 	}, nil
 }

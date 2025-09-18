@@ -17,6 +17,7 @@ type File struct {
 	OriginalName string `json:"originalName"`
 	MimeType     string `json:"mimeType"`
 	Size         int    `json:"size"`
+	RefCount     int    `json:"refCount"`
 	Visibility   string `json:"visibility"`
 	CreatedAt    string `json:"createdAt"`
 }
@@ -42,26 +43,39 @@ type SignupInput struct {
 }
 
 type StorageUsage struct {
-	UsedBytes   int     `json:"usedBytes"`
-	QuotaBytes  int     `json:"quotaBytes"`
-	PercentUsed float64 `json:"percentUsed"`
+	UsedBytes      int     `json:"usedBytes"`
+	QuotaBytes     int     `json:"quotaBytes"`
+	PercentUsed    float64 `json:"percentUsed"`
+	SavingsBytes   int     `json:"savingsBytes"`
+	SavingsPercent float64 `json:"savingsPercent"`
 }
 
 type UploadFileInput struct {
-	Files []*graphql.Upload `json:"files"`
+	Files          []*graphql.Upload `json:"files"`
+	AllowDuplicate *bool             `json:"allowDuplicate,omitempty"`
+}
+
+// Represents the uploader of a file. Can originate from either users or google_users.
+type Uploader struct {
+	Email   string  `json:"email"`
+	Name    *string `json:"name,omitempty"`
+	Picture *string `json:"picture,omitempty"`
 }
 
 type User struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID        string  `json:"id"`
+	Email     string  `json:"email"`
+	Name      *string `json:"name,omitempty"`
+	Picture   *string `json:"picture,omitempty"`
+	CreatedAt string  `json:"createdAt"`
+	UpdatedAt string  `json:"updatedAt"`
 }
 
 type UserFile struct {
-	ID         string `json:"id"`
-	UserID     string `json:"userId"`
-	FileID     string `json:"fileId"`
-	UploadedAt string `json:"uploadedAt"`
-	File       *File  `json:"file"`
+	ID         string    `json:"id"`
+	UserID     string    `json:"userId"`
+	FileID     string    `json:"fileId"`
+	UploadedAt string    `json:"uploadedAt"`
+	File       *File     `json:"file"`
+	Uploader   *Uploader `json:"uploader,omitempty"`
 }
