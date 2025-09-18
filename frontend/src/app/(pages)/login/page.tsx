@@ -5,15 +5,17 @@ import { useRouter } from "next/navigation";
 import { loginSchema } from "@/schema/auth";
 import { toast, Toaster } from "sonner";
 import { GoogleLogin } from "@react-oauth/google";
+import Loader from "@/app/components/Loader";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value.trim() }); // Trim input to avoid whitespace
+    setForm({ ...form, [name]: value.trim() });
     setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
   };
 
@@ -32,6 +34,7 @@ export default function Login() {
     }
 
     setErrors({});
+    setIsLoading(true);
 
     const mutation = `
       mutation Login($input: LoginInput!) {
@@ -40,6 +43,8 @@ export default function Login() {
           user {
             id
             email
+            name
+            picture
           }
         }
       }
@@ -58,6 +63,7 @@ export default function Login() {
       const result = await response.json();
 
       if (result.errors && result.errors.length > 0) {
+        setIsLoading(false);
         const errorMessage = String(result.errors[0].message)
           .split(" ")
           .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -67,18 +73,24 @@ export default function Login() {
       }
 
       localStorage.setItem("token", result.data.login.token);
-      localStorage.setItem("user", JSON.stringify(result.data.login.user));
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: result.data.login.user.id,
+          email: result.data.login.user.email,
+          name: result.data.login.user.name || result.data.login.user.email,
+          picture: result.data.login.user.picture || "",
+          isGoogle: false,
+        })
+      );
 
       setForm({ email: "", password: "" });
-
-      toast.success("Logged in successfully!", {
-        description: "Redirecting to dashboard...",
-      });
 
       setTimeout(() => {
         router.push("/dashboard");
       }, 2000);
     } catch (err) {
+      setIsLoading(false);
       toast.error("An error occurred while logging in. Please try again.", {
         description: "Network or server error",
       });
@@ -93,6 +105,8 @@ export default function Login() {
         return;
       }
 
+      setIsLoading(true);
+
       const mutation = `
         mutation GoogleLogin($input: GoogleLoginInput!) { 
           googleLogin(input: $input) {
@@ -100,6 +114,8 @@ export default function Login() {
             user {
               id
               email
+              name
+              picture
             }
           }
         }
@@ -114,22 +130,31 @@ export default function Login() {
         }),
       });
 
-      const result = await res.json();
+  const result = await res.json();
 
       if (result.errors && result.errors.length > 0) {
+        setIsLoading(false);
         toast.error("Google login failed", { description: result.errors[0].message });
         return;
       }
 
       localStorage.setItem("token", result.data.googleLogin.token);
-      localStorage.setItem("user", JSON.stringify(result.data.googleLogin.user));
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          id: result.data.googleLogin.user.id,
+          email: result.data.googleLogin.user.email,
+          name: result.data.googleLogin.user.name || result.data.googleLogin.user.email,
+          picture: result.data.googleLogin.user.picture || "",
+          isGoogle: true,
+        })
+      );
 
-      toast.success("Logged in with Google!", {
-        description: "Redirecting to dashboard...",
-      });
-
-      router.push("/dashboard");
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
     } catch (err) {
+      setIsLoading(false);
       toast.error("Google login error", { description: "Network or server error" });
     }
   };
@@ -137,8 +162,11 @@ export default function Login() {
   return (
     <div className="flex h-screen">
       <Toaster richColors position="top-right" />
-
-      {/* Left Section with Login Form */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white flex items-center justify-center z-1000">
+          <Loader />
+        </div>
+      )}
       <div className="flex-1 p-12 flex flex-col justify-center items-center">
         <div className="text-center">
           <h2 className="text-3xl font-bold mb-6">Log In</h2>
@@ -195,7 +223,6 @@ export default function Login() {
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
 
-          {/* Google Sign In */}
           <GoogleLogin
             onSuccess={handleGoogleSuccess}
             onError={() => toast.error("Google Sign In Failed")}
@@ -204,7 +231,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right Section with Texture */}
       <div className="flex-1 bg-[url('/login_texture.png')] bg-cover" />
     </div>
   );
