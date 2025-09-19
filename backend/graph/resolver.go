@@ -6,4 +6,5 @@ type Resolver struct {
 	AuthService   *services.AuthService
 	GoogleService *services.GoogleService
 	FileService   *services.FileService
+	FolderService *services.FolderService
 }

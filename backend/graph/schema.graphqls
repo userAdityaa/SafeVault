@@ -52,6 +52,12 @@ type Mutation {
   uploadFiles(input: UploadFileInput!): [UserFile!]!
   deleteFile(fileId: ID!): Boolean!
   purgeFile(fileId: ID!): Boolean!
+
+  # Folder mutations
+  createFolder(name: String!, parentId: ID): Folder!
+  renameFolder(folderId: ID!, newName: String!): Boolean!
+  deleteFolder(folderId: ID!): Boolean!
+  moveUserFile(mappingId: ID!, folderId: ID): Boolean!
 }
 
 type User {
@@ -76,6 +82,7 @@ type Query {
   # Just a placeholder so the schema is valid
   _health: String!
   myFiles: [UserFile!]!
+  myFolderFiles(folderId: ID): [UserFile!]!
   myDeletedFiles: [UserFile!]!
   myStorage: StorageUsage!
   findMyFileByHash(hash: String!): UserFile
@@ -84,6 +91,7 @@ type Query {
     filter: FileSearchFilter!
     pagination: PageInput
   ): UserFileConnection!
+  myFolders(parentId: ID): [Folder!]!
 }
 
 type StorageUsage {
@@ -124,4 +132,11 @@ type UserFileConnection {
   edges: [UserFileEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
+}
+
+type Folder {
+  id: ID!
+  name: String!
+  parentId: ID
+  createdAt: String!
 }
