@@ -19,11 +19,12 @@ type File struct {
 }
 
 type UserFile struct {
-	ID         uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID     uuid.UUID `gorm:"not null;index"`
-	FileID     uuid.UUID `gorm:"not null;index"`
-	Role       string    `gorm:"default:'owner'"` // owner/editor/viewer
-	UploadedAt time.Time `gorm:"autoCreateTime"`
+	ID         uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID     uuid.UUID  `gorm:"not null;index"`
+	FileID     uuid.UUID  `gorm:"not null;index"`
+	Role       string     `gorm:"default:'owner'"` // owner/editor/viewer
+	UploadedAt time.Time  `gorm:"autoCreateTime"`
+	FolderID   *uuid.UUID `gorm:"index"`
 
 	File File `gorm:"foreignKey:FileID"`
 
