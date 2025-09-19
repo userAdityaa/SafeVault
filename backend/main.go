@@ -12,6 +12,8 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+
+	// env loaded centrally in config.Load()
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/cors"
@@ -24,11 +26,12 @@ import (
 	"github.com/useradityaa/internal/services"
 )
 
-const defaultPort = "8080"
-
 func main() {
+	// Load configuration (loads .env once)
+	cfg := config.Load()
+
 	// Init Postgres
-	db := config.InitDB()
+	db := config.InitDB(cfg.DatabaseURL)
 	defer db.Close()
 
 	// Run SQL migrations from ./migrations on startup
@@ -36,25 +39,23 @@ func main() {
 		log.Fatalf("migration error: %v", err)
 	}
 
-	// Read port from env
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = defaultPort
-	}
+	port := cfg.Port
 
 	userRepo := repository.NewUserRepository(db)
 	fileRepo := repository.NewFileRepository(db)
+	folderRepo := repository.NewFolderRepository(db)
+	folderService := services.NewFolderService(folderRepo)
 
 	authService := services.AuthService{UserRepo: userRepo}
 	googleService := services.GoogleService{UserRepo: userRepo}
 
-	// MinIO config (from env)
-	minioEndpoint := os.Getenv("MINIO_ENDPOINT")
-	minioAccessKey := os.Getenv("MINIO_ACCESS_KEY")
-	minioSecretKey := os.Getenv("MINIO_SECRET_KEY")
-	minioUseSSL := os.Getenv("MINIO_USE_SSL") == "true"
-	minioBucket := os.Getenv("MINIO_BUCKET")
-	minioPublic := os.Getenv("MINIO_PUBLIC_ENDPOINT")
+	// MinIO config (from centralized config)
+	minioEndpoint := cfg.MinioEndpoint
+	minioAccessKey := cfg.MinioAccessKey
+	minioSecretKey := cfg.MinioSecretKey
+	minioUseSSL := cfg.MinioUseSSL
+	minioBucket := cfg.MinioBucket
+	minioPublic := cfg.MinioPublicURL
 
 	var minioClient *minio.Client
 	if minioEndpoint != "" && minioAccessKey != "" && minioSecretKey != "" {
@@ -82,6 +83,7 @@ func main() {
 				log.Printf("created MinIO bucket %q", minioBucket)
 			}
 		}
+		fmt.Print("Minio client initialized: ", minioClient)
 		fileService = services.NewFileService(fileRepo, minioClient, minioBucket, minioPublic)
 	}
 
@@ -91,10 +93,12 @@ func main() {
 			AuthService:   &authService,
 			GoogleService: &googleService,
 			FileService:   fileService,
+			FolderService: folderService,
 		},
 	}))
 
 	corsHandler := cors.New(cors.Options{
+		// Currently allowing all origins, methods, headers for simplicity in Development
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization"},

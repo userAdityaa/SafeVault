@@ -3,13 +3,14 @@ package auth
 import (
 	"context"
 	"fmt"
-	"os"
 
+	"github.com/useradityaa/internal/config"
 	"google.golang.org/api/idtoken"
 )
 
 func VerifyWithGoogleIDToken(idToken string) (*idtoken.Payload, error) {
-	clientID := os.Getenv("GOOGLE_CLIENT_ID")
+	cfg := config.Load()
+	clientID := cfg.GoogleClientID
 
 	payload, err := idtoken.Validate(context.Background(), idToken, clientID)
 
