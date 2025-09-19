@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/useradityaa/internal/models"
 )
@@ -38,6 +39,8 @@ type FileRepository interface {
 	SoftDeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
 	DeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
 	SearchUserFiles(ctx context.Context, userID uuid.UUID, filter SearchFilter, page Page) (items []models.UserFile, nextCursor *string, total int, err error)
+	ListUserFilesInFolder(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID) ([]models.UserFile, error)
+	MoveUserFileToFolder(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID, folderID *uuid.UUID) error
 }
 
 type fileRepository struct {
@@ -156,7 +159,7 @@ func (r *fileRepository) CreateUserFileMapping(ctx context.Context, userID, file
 
 // Get all files of a user
 func (r *fileRepository) GetUserFiles(ctx context.Context, userID uuid.UUID) ([]models.UserFile, error) {
-	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at,
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
 					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
 					 COALESCE(u.email, gu.email, '') AS uploader_email,
 					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
@@ -176,7 +179,7 @@ func (r *fileRepository) GetUserFiles(ctx context.Context, userID uuid.UUID) ([]
 	for rows.Next() {
 		var uf models.UserFile
 		var f models.File
-		err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+		err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
 			&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
 			&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture)
 		if err != nil {
@@ -221,7 +224,7 @@ func (r *fileRepository) MarkUserFileDeleted(ctx context.Context, userID, fileID
 
 // GetDeletedUserFiles returns soft-deleted mappings
 func (r *fileRepository) GetDeletedUserFiles(ctx context.Context, userID uuid.UUID) ([]models.UserFile, error) {
-	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at,
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
 					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
 					 COALESCE(u.email, gu.email, '') AS uploader_email,
 					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
@@ -240,7 +243,7 @@ func (r *fileRepository) GetDeletedUserFiles(ctx context.Context, userID uuid.UU
 	for rows.Next() {
 		var uf models.UserFile
 		var f models.File
-		if err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+		if err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
 			&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
 			&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
 			return nil, err
@@ -291,7 +294,7 @@ func (r *fileRepository) GetUserAttributedUsage(ctx context.Context, userID uuid
 
 // FindUserFileByHash locates a file mapping for a user by content hash
 func (r *fileRepository) FindUserFileByHash(ctx context.Context, userID uuid.UUID, hash string) (*models.UserFile, error) {
-	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at,
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
 					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
 			COALESCE(u.email, gu.email, '') AS uploader_email,
 					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
@@ -304,7 +307,7 @@ func (r *fileRepository) FindUserFileByHash(ctx context.Context, userID uuid.UUI
 	row := r.DB.QueryRow(ctx, query, userID, hash)
 	var uf models.UserFile
 	var f models.File
-	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
 		&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
 		&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
 		if err.Error() == "no rows in result set" {
@@ -318,7 +321,7 @@ func (r *fileRepository) FindUserFileByHash(ctx context.Context, userID uuid.UUI
 
 // GetUserFileByFileID locates a user-file mapping and joins file by file ID
 func (r *fileRepository) GetUserFileByFileID(ctx context.Context, userID, fileID uuid.UUID) (*models.UserFile, error) {
-	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at,
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
 					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
 					 COALESCE(u.email, gu.email, '') AS uploader_email,
 					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
@@ -331,7 +334,7 @@ func (r *fileRepository) GetUserFileByFileID(ctx context.Context, userID, fileID
 	row := r.DB.QueryRow(ctx, query, userID, fileID)
 	var uf models.UserFile
 	var f models.File
-	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
 		&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
 		&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
 		if err.Error() == "no rows in result set" {
@@ -345,7 +348,7 @@ func (r *fileRepository) GetUserFileByFileID(ctx context.Context, userID, fileID
 
 // GetUserFileByMappingID fetches a mapping by its id
 func (r *fileRepository) GetUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) (*models.UserFile, error) {
-	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at,
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
 					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
 					 COALESCE(u.email, gu.email, '') AS uploader_email,
 					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
@@ -358,7 +361,7 @@ func (r *fileRepository) GetUserFileByMappingID(ctx context.Context, userID uuid
 	row := r.DB.QueryRow(ctx, query, userID, mappingID)
 	var uf models.UserFile
 	var f models.File
-	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt,
+	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
 		&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
 		&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
 		if err.Error() == "no rows in result set" {
@@ -368,6 +371,54 @@ func (r *fileRepository) GetUserFileByMappingID(ctx context.Context, userID uuid
 	}
 	uf.File = f
 	return &uf, nil
+}
+
+// ListUserFilesInFolder lists active mappings within a folder (nil folder for root)
+func (r *fileRepository) ListUserFilesInFolder(ctx context.Context, userID uuid.UUID, folderID *uuid.UUID) ([]models.UserFile, error) {
+	base := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
+					f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
+					COALESCE(u.email, gu.email, '') AS uploader_email,
+					NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
+					NULLIF(COALESCE(gu.picture, ''), '') AS uploader_picture
+			 FROM user_files uf
+			 JOIN files f ON uf.file_id=f.id
+			 LEFT JOIN users u ON uf.user_id = u.id
+			 LEFT JOIN google_users gu ON uf.user_id = gu.id
+			 WHERE uf.user_id=$1 AND uf.deleted_at IS NULL`
+	var rows pgx.Rows
+	var err error
+	if folderID == nil {
+		rows, err = r.DB.Query(ctx, base+" AND uf.folder_id IS NULL", userID)
+	} else {
+		rows, err = r.DB.Query(ctx, base+" AND uf.folder_id=$2", userID, *folderID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []models.UserFile
+	for rows.Next() {
+		var uf models.UserFile
+		var f models.File
+		if err := rows.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
+			&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
+			&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
+			return nil, err
+		}
+		uf.File = f
+		result = append(result, uf)
+	}
+	return result, nil
+}
+
+// MoveUserFileToFolder moves a mapping to folder (nil for root)
+func (r *fileRepository) MoveUserFileToFolder(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID, folderID *uuid.UUID) error {
+	if folderID == nil {
+		_, err := r.DB.Exec(ctx, `UPDATE user_files SET folder_id = NULL WHERE id=$1 AND user_id=$2`, mappingID, userID)
+		return err
+	}
+	_, err := r.DB.Exec(ctx, `UPDATE user_files SET folder_id = $3 WHERE id=$1 AND user_id=$2`, mappingID, userID, *folderID)
+	return err
 }
 
 // SoftDeleteUserFileByMappingID soft-deletes a mapping by id
