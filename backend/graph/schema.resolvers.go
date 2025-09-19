@@ -186,6 +186,119 @@ func (r *mutationResolver) PurgeFile(ctx context.Context, fileID string) (bool, 
 	return true, nil
 }
 
+// CreateFolder is the resolver for the createFolder field.
+func (r *mutationResolver) CreateFolder(ctx context.Context, name string, parentID *string) (*model.Folder, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+	if r.FolderService == nil {
+		return nil, fmt.Errorf("folder service not configured")
+	}
+	var pid *uuid.UUID
+	if parentID != nil && *parentID != "" {
+		id, err := uuid.Parse(*parentID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parent id")
+		}
+		pid = &id
+	}
+	id, err := r.FolderService.CreateFolder(ctx, userID, name, pid)
+	if err != nil {
+		return nil, err
+	}
+	// Load created folder
+	// We don't have a direct getter in service; return minimal payload
+	now := time.Now().Format(time.RFC3339)
+	var pidStr *string
+	if pid != nil {
+		s := pid.String()
+		pidStr = &s
+	}
+	return &model.Folder{ID: id.String(), Name: name, ParentID: pidStr, CreatedAt: now}, nil
+}
+
+// RenameFolder is the resolver for the renameFolder field.
+func (r *mutationResolver) RenameFolder(ctx context.Context, folderID string, newName string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	if r.FolderService == nil {
+		return false, fmt.Errorf("folder service not configured")
+	}
+	fid, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder id")
+	}
+	if err := r.FolderService.RenameFolder(ctx, userID, fid, newName); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// DeleteFolder is the resolver for the deleteFolder field.
+func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	if r.FolderService == nil {
+		return false, fmt.Errorf("folder service not configured")
+	}
+	fid, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder id")
+	}
+	if err := r.FolderService.DeleteFolder(ctx, userID, fid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// MoveUserFile is the resolver for the moveUserFile field.
+func (r *mutationResolver) MoveUserFile(ctx context.Context, mappingID string, folderID *string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	if r.FileService == nil {
+		return false, fmt.Errorf("file service not configured")
+	}
+	mid, err := uuid.Parse(mappingID)
+	if err != nil {
+		return false, fmt.Errorf("invalid mapping id")
+	}
+	var fid *uuid.UUID
+	if folderID != nil && *folderID != "" {
+		id, err := uuid.Parse(*folderID)
+		if err != nil {
+			return false, fmt.Errorf("invalid folder id")
+		}
+		fid = &id
+	}
+	if err := r.FileService.FileRepo.MoveUserFileToFolder(ctx, userID, mid, fid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Health is the resolver for the _health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
 	return "ok", nil
@@ -241,6 +354,59 @@ func (r *queryResolver) MyFiles(ctx context.Context) ([]*model.UserFile, error) 
 				Name:    namePtr,
 				Picture: picPtr,
 			},
+		})
+	}
+	return out, nil
+}
+
+// MyFolderFiles is the resolver for the myFolderFiles field.
+func (r *queryResolver) MyFolderFiles(ctx context.Context, folderID *string) ([]*model.UserFile, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+	if r.FileService == nil {
+		return nil, fmt.Errorf("file service not configured")
+	}
+	var fid *uuid.UUID
+	if folderID != nil && *folderID != "" {
+		id, err := uuid.Parse(*folderID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid folder id")
+		}
+		fid = &id
+	}
+	ufs, err := r.FileService.FileRepo.ListUserFilesInFolder(ctx, userID, fid)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.UserFile, 0, len(ufs))
+	for _, uf := range ufs {
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picPtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picPtr = &p
+		}
+		out = append(out, &model.UserFile{
+			ID:         uf.ID.String(),
+			UserID:     uf.UserID.String(),
+			FileID:     uf.FileID.String(),
+			UploadedAt: uf.UploadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID: uf.File.ID.String(), Hash: uf.File.Hash, OriginalName: uf.File.OriginalName,
+				MimeType: uf.File.MimeType, Size: int(uf.File.Size), RefCount: uf.File.RefCount,
+				Visibility: uf.File.Visibility, CreatedAt: uf.File.CreatedAt.Format(time.RFC3339),
+			},
+			Uploader: &model.Uploader{Email: uf.UploaderEmail, Name: namePtr, Picture: picPtr},
 		})
 	}
 	return out, nil
@@ -528,6 +694,43 @@ func (r *queryResolver) SearchMyFiles(ctx context.Context, filter model.FileSear
 		},
 		TotalCount: total,
 	}, nil
+}
+
+// MyFolders is the resolver for the myFolders field.
+func (r *queryResolver) MyFolders(ctx context.Context, parentID *string) ([]*model.Folder, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+	if r.FolderService == nil {
+		return nil, fmt.Errorf("folder service not configured")
+	}
+	var pid *uuid.UUID
+	if parentID != nil && *parentID != "" {
+		id, err := uuid.Parse(*parentID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parent id")
+		}
+		pid = &id
+	}
+	folders, err := r.FolderService.Repo.ListFolders(ctx, userID, pid)
+	if err != nil {
+		return nil, err
+	}
+	var out []*model.Folder
+	for _, f := range folders {
+		var pStr *string
+		if f.ParentID != nil {
+			s := f.ParentID.String()
+			pStr = &s
+		}
+		out = append(out, &model.Folder{ID: f.ID.String(), Name: f.Name, ParentID: pStr, CreatedAt: f.CreatedAt.Format(time.RFC3339)})
+	}
+	return out, nil
 }
 
 // Mutation returns MutationResolver implementation.

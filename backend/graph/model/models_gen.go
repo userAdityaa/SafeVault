@@ -33,6 +33,13 @@ type FileSearchFilter struct {
 	UploaderName  *string  `json:"uploaderName,omitempty"`
 }
 
+type Folder struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	ParentID  *string `json:"parentId,omitempty"`
+	CreatedAt string  `json:"createdAt"`
+}
+
 type GoogleLoginInput struct {
 	IDToken string `json:"idToken"`
 }
