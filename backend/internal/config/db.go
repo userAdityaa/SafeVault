@@ -3,23 +3,17 @@ package config
 import (
 	"context"
 	"log"
-	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
 
-func InitDB() *pgxpool.Pool {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No .env file found, using system environment")
+func InitDB(dsn string) *pgxpool.Pool {
+	if dsn == "" {
+		log.Fatal("database DSN is empty; set DATABASE_URL_PROD or configuration value")
 	}
-
-	dsn := os.Getenv("DATABASE_URL_PROD")
 	dbpool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
-
 	return dbpool
 }
