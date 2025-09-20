@@ -1202,6 +1202,57 @@ func (r *queryResolver) SharedFoldersWithMe(ctx context.Context) ([]*model.Share
 	return result, nil
 }
 
+// SharedFolderFiles is the resolver for the sharedFolderFiles field.
+func (r *queryResolver) SharedFolderFiles(ctx context.Context, folderID string) ([]*model.UserFile, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid folder ID")
+	}
+
+	// Get files in the shared folder (access check is done in the service)
+	files, err := r.ShareService.GetSharedFolderFiles(ctx, userID, folderUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.UserFile
+	for _, file := range files {
+		result = append(result, &model.UserFile{
+			ID:         file.ID.String(),
+			UserID:     file.UserID.String(),
+			FileID:     file.FileID.String(),
+			UploadedAt: file.UploadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           file.File.ID.String(),
+				Hash:         file.File.Hash,
+				OriginalName: file.File.OriginalName,
+				MimeType:     file.File.MimeType,
+				Size:         int(file.File.Size),
+				RefCount:     file.File.RefCount,
+				Visibility:   file.File.Visibility,
+				CreatedAt:    file.File.CreatedAt.Format(time.RFC3339),
+			},
+			Uploader: &model.Uploader{
+				Email:   file.UploaderEmail,
+				Name:    &file.UploaderName,
+				Picture: &file.UploaderPicture,
+			},
+		})
+	}
+
+	return result, nil
+}
+
 // FileShares is the resolver for the fileShares field.
 func (r *queryResolver) FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error) {
 	userIDStr, ok := middleware.GetUserIDFromContext(ctx)

@@ -111,6 +111,7 @@ type Query {
   # Sharing queries
   sharedFilesWithMe: [SharedFileWithMe!]!
   sharedFoldersWithMe: [SharedFolderWithMe!]!
+  sharedFolderFiles(folderId: ID!): [UserFile!]!
   fileShares(fileId: ID!): [FileShare!]!
   folderShares(folderId: ID!): [FolderShare!]!
 
