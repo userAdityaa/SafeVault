@@ -93,6 +93,7 @@ func main() {
 	// Create services
 	shareService := services.NewShareService(shareRepo, userRepo, fileRepo, folderRepo)
 	publicLinkService := services.NewPublicLinkService(publicLinkRepo, shareRepo, userRepo, fileRepo, folderRepo)
+	adminService := services.NewAdminService(userRepo, fileRepo, folderRepo)
 
 	// Create GraphQL server
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
@@ -103,6 +104,7 @@ func main() {
 			FolderService:     folderService,
 			ShareService:      shareService,
 			PublicLinkService: publicLinkService,
+			AdminService:      adminService,
 		},
 	}))
 
