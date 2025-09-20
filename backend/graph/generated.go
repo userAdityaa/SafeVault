@@ -170,6 +170,7 @@ type ComplexityRoot struct {
 		MyFolderFiles           func(childComplexity int, folderID *string) int
 		MyFolders               func(childComplexity int, parentID *string) int
 		MyStorage               func(childComplexity int) int
+		PublicFolderFiles       func(childComplexity int, token string) int
 		ResolvePublicFileLink   func(childComplexity int, token string) int
 		ResolvePublicFolderLink func(childComplexity int, token string) int
 		SearchMyFiles           func(childComplexity int, filter model.FileSearchFilter, pagination *model.PageInput) int
@@ -282,6 +283,7 @@ type QueryResolver interface {
 	FolderShares(ctx context.Context, folderID string) ([]*model.FolderShare, error)
 	ResolvePublicFileLink(ctx context.Context, token string) (*model.PublicFileLinkResolved, error)
 	ResolvePublicFolderLink(ctx context.Context, token string) (*model.PublicFolderLinkResolved, error)
+	PublicFolderFiles(ctx context.Context, token string) ([]*model.UserFile, error)
 }
 
 type executableSchema struct {
@@ -973,6 +975,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyStorage(childComplexity), true
+	case "Query.publicFolderFiles":
+		if e.complexity.Query.PublicFolderFiles == nil {
+			break
+		}
+
+		args, err := ec.field_Query_publicFolderFiles_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.PublicFolderFiles(childComplexity, args["token"].(string)), true
 	case "Query.resolvePublicFileLink":
 		if e.complexity.Query.ResolvePublicFileLink == nil {
 			break
@@ -1739,6 +1752,17 @@ func (ec *executionContext) field_Query_myFolders_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["parentId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_publicFolderFiles_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "token", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
 	return args, nil
 }
 
@@ -5420,6 +5444,61 @@ func (ec *executionContext) fieldContext_Query_resolvePublicFolderLink(ctx conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_resolvePublicFolderLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_publicFolderFiles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_publicFolderFiles,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().PublicFolderFiles(ctx, fc.Args["token"].(string))
+		},
+		nil,
+		ec.marshalNUserFile2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUserFileᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_publicFolderFiles(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_UserFile_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_UserFile_userId(ctx, field)
+			case "fileId":
+				return ec.fieldContext_UserFile_fileId(ctx, field)
+			case "uploadedAt":
+				return ec.fieldContext_UserFile_uploadedAt(ctx, field)
+			case "file":
+				return ec.fieldContext_UserFile_file(ctx, field)
+			case "uploader":
+				return ec.fieldContext_UserFile_uploader(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type UserFile", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_publicFolderFiles_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9746,6 +9825,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_resolvePublicFolderLink(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "publicFolderFiles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_publicFolderFiles(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 

@@ -1399,6 +1399,59 @@ func (r *queryResolver) ResolvePublicFolderLink(ctx context.Context, token strin
 	}, nil
 }
 
+// PublicFolderFiles is the resolver for the publicFolderFiles field.
+func (r *queryResolver) PublicFolderFiles(ctx context.Context, token string) ([]*model.UserFile, error) {
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+	if r.ShareService == nil {
+		return nil, fmt.Errorf("share service not configured")
+	}
+
+	// First resolve the public folder link to get the folder
+	folder, _, _, revoked, err := r.PublicLinkService.ResolveFolderLink(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if revoked || folder == nil {
+		return nil, fmt.Errorf("folder link not found or has been revoked")
+	}
+
+	// Get the files in this folder
+	userFiles, err := r.ShareService.GetPublicFolderFiles(ctx, folder.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder files: %w", err)
+	}
+
+	// Convert to GraphQL model format (same as SharedFolderFiles)
+	var result []*model.UserFile
+	for _, file := range userFiles {
+		result = append(result, &model.UserFile{
+			ID:         file.ID.String(),
+			UserID:     file.UserID.String(),
+			FileID:     file.FileID.String(),
+			UploadedAt: file.UploadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           file.File.ID.String(),
+				Hash:         file.File.Hash,
+				OriginalName: file.File.OriginalName,
+				MimeType:     file.File.MimeType,
+				Size:         int(file.File.Size),
+				RefCount:     file.File.RefCount,
+				Visibility:   file.File.Visibility,
+				CreatedAt:    file.File.CreatedAt.Format(time.RFC3339),
+			},
+			Uploader: &model.Uploader{
+				Email:   file.UploaderEmail,
+				Name:    &file.UploaderName,
+				Picture: &file.UploaderPicture,
+			},
+		})
+	}
+
+	return result, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 

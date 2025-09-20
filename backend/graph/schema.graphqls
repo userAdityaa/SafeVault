@@ -118,6 +118,7 @@ type Query {
   # Public link resolution (no auth required)
   resolvePublicFileLink(token: String!): PublicFileLinkResolved
   resolvePublicFolderLink(token: String!): PublicFolderLinkResolved
+  publicFolderFiles(token: String!): [UserFile!]!
 }
 
 type StorageUsage {
