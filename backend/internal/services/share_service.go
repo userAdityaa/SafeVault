@@ -253,3 +253,14 @@ func (s *ShareService) GetSharedFolderFiles(ctx context.Context, userID uuid.UUI
 
 	return files, nil
 }
+
+// GetPublicFolderFiles gets files within a public folder (no access check needed since it's public)
+func (s *ShareService) GetPublicFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error) {
+	// Get files in the folder directly from repository
+	files, err := s.ShareRepo.GetFolderFiles(ctx, folderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder files: %w", err)
+	}
+
+	return files, nil
+}
