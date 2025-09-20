@@ -444,6 +444,182 @@ func (r *mutationResolver) UnshareFolder(ctx context.Context, folderID string, s
 	return true, nil
 }
 
+// CreatePublicFileLink is the resolver for the createPublicFileLink field.
+func (r *mutationResolver) CreatePublicFileLink(ctx context.Context, fileID string, expiresAt *string) (*model.PublicFileLink, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file ID")
+	}
+	var expPtr *time.Time
+	if expiresAt != nil && *expiresAt != "" {
+		t, err := time.Parse(time.RFC3339, *expiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expiresAt format; must be RFC3339")
+		}
+		expPtr = &t
+	}
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+	token, exp, err := r.PublicLinkService.CreateFileLink(ctx, userID, fileUUID, expPtr)
+	if err != nil {
+		return nil, err
+	}
+	// Try to fetch active link to obtain created_at / revoked_at if needed (best-effort)
+	var createdAt = time.Now().Format(time.RFC3339)
+	// repository GetActiveFileLinkByFile returns (token, expiresAt, revokedAt)
+	if tkn, exp2, revoked, e2 := r.PublicLinkService.PublicRepo.GetActiveFileLinkByFile(ctx, fileUUID); e2 == nil && tkn == token {
+		if exp2 != nil {
+			exp = exp2
+		}
+		if revoked != nil { /* active link shouldn't be revoked, ignore */
+		}
+	}
+	var expStr *string
+	if exp != nil {
+		s := exp.Format(time.RFC3339)
+		expStr = &s
+	}
+	return &model.PublicFileLink{
+		FileID:    fileID,
+		Token:     token,
+		URL:       fmt.Sprintf("/share/%s", token),
+		CreatedAt: createdAt,
+		ExpiresAt: expStr,
+	}, nil
+}
+
+// RevokePublicFileLink is the resolver for the revokePublicFileLink field.
+func (r *mutationResolver) RevokePublicFileLink(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file ID")
+	}
+	if r.PublicLinkService == nil {
+		return false, fmt.Errorf("public link service not configured")
+	}
+	if err := r.PublicLinkService.RevokeFileLink(ctx, userID, fileUUID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// CreatePublicFolderLink is the resolver for the createPublicFolderLink field.
+func (r *mutationResolver) CreatePublicFolderLink(ctx context.Context, folderID string, expiresAt *string) (*model.PublicFolderLink, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid folder ID")
+	}
+	var expPtr *time.Time
+	if expiresAt != nil && *expiresAt != "" {
+		t, err := time.Parse(time.RFC3339, *expiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expiresAt format; must be RFC3339")
+		}
+		expPtr = &t
+	}
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+	token, exp, err := r.PublicLinkService.CreateFolderLink(ctx, userID, folderUUID, expPtr)
+	if err != nil {
+		return nil, err
+	}
+	var createdAt = time.Now().Format(time.RFC3339)
+	if tkn, exp2, revoked, e2 := r.PublicLinkService.PublicRepo.GetActiveFolderLinkByFolder(ctx, folderUUID); e2 == nil && tkn == token {
+		if exp2 != nil {
+			exp = exp2
+		}
+		if revoked != nil { /* ignore revoked sanity */
+		}
+	}
+	var expStr *string
+	if exp != nil {
+		s := exp.Format(time.RFC3339)
+		expStr = &s
+	}
+	return &model.PublicFolderLink{
+		FolderID:  folderID,
+		Token:     token,
+		URL:       fmt.Sprintf("/share/%s", token),
+		CreatedAt: createdAt,
+		ExpiresAt: expStr,
+	}, nil
+}
+
+// RevokePublicFolderLink is the resolver for the revokePublicFolderLink field.
+func (r *mutationResolver) RevokePublicFolderLink(ctx context.Context, folderID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder ID")
+	}
+	if r.PublicLinkService == nil {
+		return false, fmt.Errorf("public link service not configured")
+	}
+	if err := r.PublicLinkService.RevokeFolderLink(ctx, userID, folderUUID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// AddPublicFileToMyStorage is the resolver for the addPublicFileToMyStorage field.
+func (r *mutationResolver) AddPublicFileToMyStorage(ctx context.Context, token string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+	if r.PublicLinkService == nil {
+		return false, fmt.Errorf("public link service not configured")
+	}
+	f, _, _, revoked, err := r.PublicLinkService.ResolveFileLink(ctx, token)
+	if err != nil {
+		return false, err
+	}
+	if revoked || f == nil {
+		return false, fmt.Errorf("link invalid or revoked")
+	}
+	if err := r.PublicLinkService.AddPublicFileToStorage(ctx, userID, f.ID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // Health is the resolver for the _health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
 	return "ok", nil
@@ -1099,6 +1275,77 @@ func (r *queryResolver) FolderShares(ctx context.Context, folderID string) ([]*m
 	}
 
 	return result, nil
+}
+
+// ResolvePublicFileLink is the resolver for the resolvePublicFileLink field.
+func (r *queryResolver) ResolvePublicFileLink(ctx context.Context, token string) (*model.PublicFileLinkResolved, error) {
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+	f, owner, expiresAt, revoked, err := r.PublicLinkService.ResolveFileLink(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if revoked || f == nil || owner == nil {
+		return &model.PublicFileLinkResolved{Token: token, Revoked: true}, nil
+	}
+	var expStr *string
+	if expiresAt != nil {
+		s := expiresAt.Format(time.RFC3339)
+		expStr = &s
+	}
+	return &model.PublicFileLinkResolved{
+		Token: token,
+		File: &model.File{
+			ID:           f.ID.String(),
+			Hash:         f.Hash,
+			OriginalName: f.OriginalName,
+			MimeType:     f.MimeType,
+			Size:         int(f.Size),
+			RefCount:     f.RefCount,
+			Visibility:   f.Visibility,
+			CreatedAt:    f.CreatedAt.Format(time.RFC3339),
+		},
+		Owner:     &model.User{ID: owner.ID.String(), Email: owner.Email, CreatedAt: owner.CreatedAt.Format(time.RFC3339), UpdatedAt: owner.CreatedAt.Format(time.RFC3339)},
+		ExpiresAt: expStr,
+		Revoked:   false,
+	}, nil
+}
+
+// ResolvePublicFolderLink is the resolver for the resolvePublicFolderLink field.
+func (r *queryResolver) ResolvePublicFolderLink(ctx context.Context, token string) (*model.PublicFolderLinkResolved, error) {
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+	fo, owner, expiresAt, revoked, err := r.PublicLinkService.ResolveFolderLink(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if revoked || fo == nil || owner == nil {
+		return &model.PublicFolderLinkResolved{Token: token, Revoked: true}, nil
+	}
+	var expStr *string
+	if expiresAt != nil {
+		s := expiresAt.Format(time.RFC3339)
+		expStr = &s
+	}
+	var parentID *string
+	if fo.ParentID != nil {
+		p := fo.ParentID.String()
+		parentID = &p
+	}
+	return &model.PublicFolderLinkResolved{
+		Token: token,
+		Folder: &model.Folder{
+			ID:        fo.ID.String(),
+			Name:      fo.Name,
+			ParentID:  parentID,
+			CreatedAt: fo.CreatedAt.Format(time.RFC3339),
+		},
+		Owner:     &model.User{ID: owner.ID.String(), Email: owner.Email, CreatedAt: owner.CreatedAt.Format(time.RFC3339), UpdatedAt: owner.CreatedAt.Format(time.RFC3339)},
+		ExpiresAt: expStr,
+		Revoked:   false,
+	}, nil
 }
 
 // Mutation returns MutationResolver implementation.

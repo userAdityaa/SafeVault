@@ -90,6 +90,40 @@ type PageInput struct {
 	Cursor *string `json:"cursor,omitempty"`
 }
 
+type PublicFileLink struct {
+	FileID    string  `json:"fileId"`
+	Token     string  `json:"token"`
+	URL       string  `json:"url"`
+	CreatedAt string  `json:"createdAt"`
+	ExpiresAt *string `json:"expiresAt,omitempty"`
+	RevokedAt *string `json:"revokedAt,omitempty"`
+}
+
+type PublicFileLinkResolved struct {
+	Token     string  `json:"token"`
+	File      *File   `json:"file"`
+	Owner     *User   `json:"owner"`
+	ExpiresAt *string `json:"expiresAt,omitempty"`
+	Revoked   bool    `json:"revoked"`
+}
+
+type PublicFolderLink struct {
+	FolderID  string  `json:"folderId"`
+	Token     string  `json:"token"`
+	URL       string  `json:"url"`
+	CreatedAt string  `json:"createdAt"`
+	ExpiresAt *string `json:"expiresAt,omitempty"`
+	RevokedAt *string `json:"revokedAt,omitempty"`
+}
+
+type PublicFolderLinkResolved struct {
+	Token     string  `json:"token"`
+	Folder    *Folder `json:"folder"`
+	Owner     *User   `json:"owner"`
+	ExpiresAt *string `json:"expiresAt,omitempty"`
+	Revoked   bool    `json:"revoked"`
+}
+
 type Query struct {
 }
 

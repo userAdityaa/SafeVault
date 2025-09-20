@@ -99,20 +99,25 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateFolder  func(childComplexity int, name string, parentID *string) int
-		DeleteFile    func(childComplexity int, fileID string) int
-		DeleteFolder  func(childComplexity int, folderID string) int
-		GoogleLogin   func(childComplexity int, input model.GoogleLoginInput) int
-		Login         func(childComplexity int, input model.LoginInput) int
-		MoveUserFile  func(childComplexity int, mappingID string, folderID *string) int
-		PurgeFile     func(childComplexity int, fileID string) int
-		RenameFolder  func(childComplexity int, folderID string, newName string) int
-		ShareFile     func(childComplexity int, input model.ShareFileInput) int
-		ShareFolder   func(childComplexity int, input model.ShareFolderInput) int
-		Signup        func(childComplexity int, input model.SignupInput) int
-		UnshareFile   func(childComplexity int, fileID string, sharedWithEmail string) int
-		UnshareFolder func(childComplexity int, folderID string, sharedWithEmail string) int
-		UploadFiles   func(childComplexity int, input model.UploadFileInput) int
+		AddPublicFileToMyStorage func(childComplexity int, token string) int
+		CreateFolder             func(childComplexity int, name string, parentID *string) int
+		CreatePublicFileLink     func(childComplexity int, fileID string, expiresAt *string) int
+		CreatePublicFolderLink   func(childComplexity int, folderID string, expiresAt *string) int
+		DeleteFile               func(childComplexity int, fileID string) int
+		DeleteFolder             func(childComplexity int, folderID string) int
+		GoogleLogin              func(childComplexity int, input model.GoogleLoginInput) int
+		Login                    func(childComplexity int, input model.LoginInput) int
+		MoveUserFile             func(childComplexity int, mappingID string, folderID *string) int
+		PurgeFile                func(childComplexity int, fileID string) int
+		RenameFolder             func(childComplexity int, folderID string, newName string) int
+		RevokePublicFileLink     func(childComplexity int, fileID string) int
+		RevokePublicFolderLink   func(childComplexity int, folderID string) int
+		ShareFile                func(childComplexity int, input model.ShareFileInput) int
+		ShareFolder              func(childComplexity int, input model.ShareFolderInput) int
+		Signup                   func(childComplexity int, input model.SignupInput) int
+		UnshareFile              func(childComplexity int, fileID string, sharedWithEmail string) int
+		UnshareFolder            func(childComplexity int, folderID string, sharedWithEmail string) int
+		UploadFiles              func(childComplexity int, input model.UploadFileInput) int
 	}
 
 	PageInfo struct {
@@ -120,20 +125,56 @@ type ComplexityRoot struct {
 		HasNextPage func(childComplexity int) int
 	}
 
+	PublicFileLink struct {
+		CreatedAt func(childComplexity int) int
+		ExpiresAt func(childComplexity int) int
+		FileID    func(childComplexity int) int
+		RevokedAt func(childComplexity int) int
+		Token     func(childComplexity int) int
+		URL       func(childComplexity int) int
+	}
+
+	PublicFileLinkResolved struct {
+		ExpiresAt func(childComplexity int) int
+		File      func(childComplexity int) int
+		Owner     func(childComplexity int) int
+		Revoked   func(childComplexity int) int
+		Token     func(childComplexity int) int
+	}
+
+	PublicFolderLink struct {
+		CreatedAt func(childComplexity int) int
+		ExpiresAt func(childComplexity int) int
+		FolderID  func(childComplexity int) int
+		RevokedAt func(childComplexity int) int
+		Token     func(childComplexity int) int
+		URL       func(childComplexity int) int
+	}
+
+	PublicFolderLinkResolved struct {
+		ExpiresAt func(childComplexity int) int
+		Folder    func(childComplexity int) int
+		Owner     func(childComplexity int) int
+		Revoked   func(childComplexity int) int
+		Token     func(childComplexity int) int
+	}
+
 	Query struct {
-		FileShares          func(childComplexity int, fileID string) int
-		FileURL             func(childComplexity int, fileID string, inline *bool) int
-		FindMyFileByHash    func(childComplexity int, hash string) int
-		FolderShares        func(childComplexity int, folderID string) int
-		Health              func(childComplexity int) int
-		MyDeletedFiles      func(childComplexity int) int
-		MyFiles             func(childComplexity int) int
-		MyFolderFiles       func(childComplexity int, folderID *string) int
-		MyFolders           func(childComplexity int, parentID *string) int
-		MyStorage           func(childComplexity int) int
-		SearchMyFiles       func(childComplexity int, filter model.FileSearchFilter, pagination *model.PageInput) int
-		SharedFilesWithMe   func(childComplexity int) int
-		SharedFoldersWithMe func(childComplexity int) int
+		FileShares              func(childComplexity int, fileID string) int
+		FileURL                 func(childComplexity int, fileID string, inline *bool) int
+		FindMyFileByHash        func(childComplexity int, hash string) int
+		FolderShares            func(childComplexity int, folderID string) int
+		Health                  func(childComplexity int) int
+		MyDeletedFiles          func(childComplexity int) int
+		MyFiles                 func(childComplexity int) int
+		MyFolderFiles           func(childComplexity int, folderID *string) int
+		MyFolders               func(childComplexity int, parentID *string) int
+		MyStorage               func(childComplexity int) int
+		ResolvePublicFileLink   func(childComplexity int, token string) int
+		ResolvePublicFolderLink func(childComplexity int, token string) int
+		SearchMyFiles           func(childComplexity int, filter model.FileSearchFilter, pagination *model.PageInput) int
+		SharedFilesWithMe       func(childComplexity int) int
+		SharedFoldersWithMe     func(childComplexity int) int
 	}
 
 	SharedFileWithMe struct {
@@ -217,6 +258,11 @@ type MutationResolver interface {
 	ShareFolder(ctx context.Context, input model.ShareFolderInput) (*model.FolderShare, error)
 	UnshareFile(ctx context.Context, fileID string, sharedWithEmail string) (bool, error)
 	UnshareFolder(ctx context.Context, folderID string, sharedWithEmail string) (bool, error)
+	CreatePublicFileLink(ctx context.Context, fileID string, expiresAt *string) (*model.PublicFileLink, error)
+	RevokePublicFileLink(ctx context.Context, fileID string) (bool, error)
+	CreatePublicFolderLink(ctx context.Context, folderID string, expiresAt *string) (*model.PublicFolderLink, error)
+	RevokePublicFolderLink(ctx context.Context, folderID string) (bool, error)
+	AddPublicFileToMyStorage(ctx context.Context, token string) (bool, error)
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
@@ -232,6 +278,8 @@ type QueryResolver interface {
 	SharedFoldersWithMe(ctx context.Context) ([]*model.SharedFolderWithMe, error)
 	FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error)
 	FolderShares(ctx context.Context, folderID string) ([]*model.FolderShare, error)
+	ResolvePublicFileLink(ctx context.Context, token string) (*model.PublicFileLinkResolved, error)
+	ResolvePublicFolderLink(ctx context.Context, token string) (*model.PublicFolderLinkResolved, error)
 }
 
 type executableSchema struct {
@@ -474,6 +522,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.FolderShare.SharedWithUser(childComplexity), true
 
+	case "Mutation.addPublicFileToMyStorage":
+		if e.complexity.Mutation.AddPublicFileToMyStorage == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_addPublicFileToMyStorage_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.AddPublicFileToMyStorage(childComplexity, args["token"].(string)), true
 	case "Mutation.createFolder":
 		if e.complexity.Mutation.CreateFolder == nil {
 			break
@@ -485,6 +544,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.CreateFolder(childComplexity, args["name"].(string), args["parentId"].(*string)), true
+	case "Mutation.createPublicFileLink":
+		if e.complexity.Mutation.CreatePublicFileLink == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createPublicFileLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreatePublicFileLink(childComplexity, args["fileId"].(string), args["expiresAt"].(*string)), true
+	case "Mutation.createPublicFolderLink":
+		if e.complexity.Mutation.CreatePublicFolderLink == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createPublicFolderLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.CreatePublicFolderLink(childComplexity, args["folderId"].(string), args["expiresAt"].(*string)), true
 	case "Mutation.deleteFile":
 		if e.complexity.Mutation.DeleteFile == nil {
 			break
@@ -562,6 +643,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.RenameFolder(childComplexity, args["folderId"].(string), args["newName"].(string)), true
+	case "Mutation.revokePublicFileLink":
+		if e.complexity.Mutation.RevokePublicFileLink == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_revokePublicFileLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RevokePublicFileLink(childComplexity, args["fileId"].(string)), true
+	case "Mutation.revokePublicFolderLink":
+		if e.complexity.Mutation.RevokePublicFolderLink == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_revokePublicFolderLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RevokePublicFolderLink(childComplexity, args["folderId"].(string)), true
 	case "Mutation.shareFile":
 		if e.complexity.Mutation.ShareFile == nil {
 			break
@@ -641,6 +744,142 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.PageInfo.HasNextPage(childComplexity), true
+
+	case "PublicFileLink.createdAt":
+		if e.complexity.PublicFileLink.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.CreatedAt(childComplexity), true
+	case "PublicFileLink.expiresAt":
+		if e.complexity.PublicFileLink.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.ExpiresAt(childComplexity), true
+	case "PublicFileLink.fileId":
+		if e.complexity.PublicFileLink.FileID == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.FileID(childComplexity), true
+	case "PublicFileLink.revokedAt":
+		if e.complexity.PublicFileLink.RevokedAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.RevokedAt(childComplexity), true
+	case "PublicFileLink.token":
+		if e.complexity.PublicFileLink.Token == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.Token(childComplexity), true
+	case "PublicFileLink.url":
+		if e.complexity.PublicFileLink.URL == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLink.URL(childComplexity), true
+
+	case "PublicFileLinkResolved.expiresAt":
+		if e.complexity.PublicFileLinkResolved.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLinkResolved.ExpiresAt(childComplexity), true
+	case "PublicFileLinkResolved.file":
+		if e.complexity.PublicFileLinkResolved.File == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLinkResolved.File(childComplexity), true
+	case "PublicFileLinkResolved.owner":
+		if e.complexity.PublicFileLinkResolved.Owner == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLinkResolved.Owner(childComplexity), true
+	case "PublicFileLinkResolved.revoked":
+		if e.complexity.PublicFileLinkResolved.Revoked == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLinkResolved.Revoked(childComplexity), true
+	case "PublicFileLinkResolved.token":
+		if e.complexity.PublicFileLinkResolved.Token == nil {
+			break
+		}
+
+		return e.complexity.PublicFileLinkResolved.Token(childComplexity), true
+
+	case "PublicFolderLink.createdAt":
+		if e.complexity.PublicFolderLink.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.CreatedAt(childComplexity), true
+	case "PublicFolderLink.expiresAt":
+		if e.complexity.PublicFolderLink.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.ExpiresAt(childComplexity), true
+	case "PublicFolderLink.folderId":
+		if e.complexity.PublicFolderLink.FolderID == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.FolderID(childComplexity), true
+	case "PublicFolderLink.revokedAt":
+		if e.complexity.PublicFolderLink.RevokedAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.RevokedAt(childComplexity), true
+	case "PublicFolderLink.token":
+		if e.complexity.PublicFolderLink.Token == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.Token(childComplexity), true
+	case "PublicFolderLink.url":
+		if e.complexity.PublicFolderLink.URL == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLink.URL(childComplexity), true
+
+	case "PublicFolderLinkResolved.expiresAt":
+		if e.complexity.PublicFolderLinkResolved.ExpiresAt == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLinkResolved.ExpiresAt(childComplexity), true
+	case "PublicFolderLinkResolved.folder":
+		if e.complexity.PublicFolderLinkResolved.Folder == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLinkResolved.Folder(childComplexity), true
+	case "PublicFolderLinkResolved.owner":
+		if e.complexity.PublicFolderLinkResolved.Owner == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLinkResolved.Owner(childComplexity), true
+	case "PublicFolderLinkResolved.revoked":
+		if e.complexity.PublicFolderLinkResolved.Revoked == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLinkResolved.Revoked(childComplexity), true
+	case "PublicFolderLinkResolved.token":
+		if e.complexity.PublicFolderLinkResolved.Token == nil {
+			break
+		}
+
+		return e.complexity.PublicFolderLinkResolved.Token(childComplexity), true
 
 	case "Query.fileShares":
 		if e.complexity.Query.FileShares == nil {
@@ -732,6 +971,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyStorage(childComplexity), true
+	case "Query.resolvePublicFileLink":
+		if e.complexity.Query.ResolvePublicFileLink == nil {
+			break
+		}
+
+		args, err := ec.field_Query_resolvePublicFileLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ResolvePublicFileLink(childComplexity, args["token"].(string)), true
+	case "Query.resolvePublicFolderLink":
+		if e.complexity.Query.ResolvePublicFolderLink == nil {
+			break
+		}
+
+		args, err := ec.field_Query_resolvePublicFolderLink_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.ResolvePublicFolderLink(childComplexity, args["token"].(string)), true
 	case "Query.searchMyFiles":
 		if e.complexity.Query.SearchMyFiles == nil {
 			break
@@ -1142,6 +1403,17 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_addPublicFileToMyStorage_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "token", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createFolder_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1155,6 +1427,38 @@ func (ec *executionContext) field_Mutation_createFolder_args(ctx context.Context
 		return nil, err
 	}
 	args["parentId"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createPublicFileLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "expiresAt", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["expiresAt"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_createPublicFolderLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "folderId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["folderId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "expiresAt", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["expiresAt"] = arg1
 	return args, nil
 }
 
@@ -1242,6 +1546,28 @@ func (ec *executionContext) field_Mutation_renameFolder_args(ctx context.Context
 		return nil, err
 	}
 	args["newName"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_revokePublicFileLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_revokePublicFolderLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "folderId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["folderId"] = arg0
 	return args, nil
 }
 
@@ -1400,6 +1726,28 @@ func (ec *executionContext) field_Query_myFolders_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["parentId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_resolvePublicFileLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "token", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_resolvePublicFolderLink_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "token", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["token"] = arg0
 	return args, nil
 }
 
@@ -3277,6 +3625,239 @@ func (ec *executionContext) fieldContext_Mutation_unshareFolder(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createPublicFileLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createPublicFileLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreatePublicFileLink(ctx, fc.Args["fileId"].(string), fc.Args["expiresAt"].(*string))
+		},
+		nil,
+		ec.marshalNPublicFileLink2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFileLink,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createPublicFileLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "fileId":
+				return ec.fieldContext_PublicFileLink_fileId(ctx, field)
+			case "token":
+				return ec.fieldContext_PublicFileLink_token(ctx, field)
+			case "url":
+				return ec.fieldContext_PublicFileLink_url(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PublicFileLink_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PublicFileLink_expiresAt(ctx, field)
+			case "revokedAt":
+				return ec.fieldContext_PublicFileLink_revokedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicFileLink", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createPublicFileLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_revokePublicFileLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_revokePublicFileLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().RevokePublicFileLink(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_revokePublicFileLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_revokePublicFileLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createPublicFolderLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_createPublicFolderLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().CreatePublicFolderLink(ctx, fc.Args["folderId"].(string), fc.Args["expiresAt"].(*string))
+		},
+		nil,
+		ec.marshalNPublicFolderLink2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFolderLink,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createPublicFolderLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "folderId":
+				return ec.fieldContext_PublicFolderLink_folderId(ctx, field)
+			case "token":
+				return ec.fieldContext_PublicFolderLink_token(ctx, field)
+			case "url":
+				return ec.fieldContext_PublicFolderLink_url(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_PublicFolderLink_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PublicFolderLink_expiresAt(ctx, field)
+			case "revokedAt":
+				return ec.fieldContext_PublicFolderLink_revokedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicFolderLink", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createPublicFolderLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_revokePublicFolderLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_revokePublicFolderLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().RevokePublicFolderLink(ctx, fc.Args["folderId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_revokePublicFolderLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_revokePublicFolderLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_addPublicFileToMyStorage(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_addPublicFileToMyStorage,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().AddPublicFileToMyStorage(ctx, fc.Args["token"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_addPublicFileToMyStorage(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_addPublicFileToMyStorage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -3325,6 +3906,700 @@ func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field gra
 func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "PageInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_fileId(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_fileId,
+		func(ctx context.Context) (any, error) {
+			return obj.FileID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_fileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_token(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_token,
+		func(ctx context.Context) (any, error) {
+			return obj.Token, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_url(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_url,
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLink_revokedAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLink_revokedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RevokedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLink_revokedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLinkResolved_token(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLinkResolved_token,
+		func(ctx context.Context) (any, error) {
+			return obj.Token, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLinkResolved_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLinkResolved_file(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLinkResolved_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLinkResolved_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLinkResolved_owner(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLinkResolved_owner,
+		func(ctx context.Context) (any, error) {
+			return obj.Owner, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLinkResolved_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLinkResolved_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLinkResolved_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLinkResolved_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFileLinkResolved_revoked(ctx context.Context, field graphql.CollectedField, obj *model.PublicFileLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFileLinkResolved_revoked,
+		func(ctx context.Context) (any, error) {
+			return obj.Revoked, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFileLinkResolved_revoked(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFileLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_folderId(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_folderId,
+		func(ctx context.Context) (any, error) {
+			return obj.FolderID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_folderId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_token(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_token,
+		func(ctx context.Context) (any, error) {
+			return obj.Token, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_url(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_url,
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLink_revokedAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLink) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLink_revokedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RevokedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLink_revokedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLink",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLinkResolved_token(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLinkResolved_token,
+		func(ctx context.Context) (any, error) {
+			return obj.Token, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLinkResolved_token(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLinkResolved_folder(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLinkResolved_folder,
+		func(ctx context.Context) (any, error) {
+			return obj.Folder, nil
+		},
+		nil,
+		ec.marshalNFolder2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFolder,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLinkResolved_folder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Folder_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Folder_name(ctx, field)
+			case "parentId":
+				return ec.fieldContext_Folder_parentId(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Folder_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Folder", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLinkResolved_owner(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLinkResolved_owner,
+		func(ctx context.Context) (any, error) {
+			return obj.Owner, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLinkResolved_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLinkResolved_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLinkResolved_expiresAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLinkResolved_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLinkResolved",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _PublicFolderLinkResolved_revoked(ctx context.Context, field graphql.CollectedField, obj *model.PublicFolderLinkResolved) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_PublicFolderLinkResolved_revoked,
+		func(ctx context.Context) (any, error) {
+			return obj.Revoked, nil
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_PublicFolderLinkResolved_revoked(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "PublicFolderLinkResolved",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -3960,6 +5235,112 @@ func (ec *executionContext) fieldContext_Query_folderShares(ctx context.Context,
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_folderShares_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_resolvePublicFileLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_resolvePublicFileLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().ResolvePublicFileLink(ctx, fc.Args["token"].(string))
+		},
+		nil,
+		ec.marshalOPublicFileLinkResolved2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFileLinkResolved,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_resolvePublicFileLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "token":
+				return ec.fieldContext_PublicFileLinkResolved_token(ctx, field)
+			case "file":
+				return ec.fieldContext_PublicFileLinkResolved_file(ctx, field)
+			case "owner":
+				return ec.fieldContext_PublicFileLinkResolved_owner(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PublicFileLinkResolved_expiresAt(ctx, field)
+			case "revoked":
+				return ec.fieldContext_PublicFileLinkResolved_revoked(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicFileLinkResolved", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_resolvePublicFileLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_resolvePublicFolderLink(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_resolvePublicFolderLink,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().ResolvePublicFolderLink(ctx, fc.Args["token"].(string))
+		},
+		nil,
+		ec.marshalOPublicFolderLinkResolved2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFolderLinkResolved,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_resolvePublicFolderLink(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "token":
+				return ec.fieldContext_PublicFolderLinkResolved_token(ctx, field)
+			case "folder":
+				return ec.fieldContext_PublicFolderLinkResolved_folder(ctx, field)
+			case "owner":
+				return ec.fieldContext_PublicFolderLinkResolved_owner(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_PublicFolderLinkResolved_expiresAt(ctx, field)
+			case "revoked":
+				return ec.fieldContext_PublicFolderLinkResolved_revoked(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type PublicFolderLinkResolved", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_resolvePublicFolderLink_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7606,6 +8987,41 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createPublicFileLink":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createPublicFileLink(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "revokePublicFileLink":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_revokePublicFileLink(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createPublicFolderLink":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createPublicFolderLink(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "revokePublicFolderLink":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_revokePublicFolderLink(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "addPublicFileToMyStorage":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_addPublicFileToMyStorage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -7644,6 +9060,234 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 			out.Values[i] = ec._PageInfo_endCursor(ctx, field, obj)
 		case "hasNextPage":
 			out.Values[i] = ec._PageInfo_hasNextPage(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicFileLinkImplementors = []string{"PublicFileLink"}
+
+func (ec *executionContext) _PublicFileLink(ctx context.Context, sel ast.SelectionSet, obj *model.PublicFileLink) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicFileLinkImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicFileLink")
+		case "fileId":
+			out.Values[i] = ec._PublicFileLink_fileId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "token":
+			out.Values[i] = ec._PublicFileLink_token(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._PublicFileLink_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._PublicFileLink_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._PublicFileLink_expiresAt(ctx, field, obj)
+		case "revokedAt":
+			out.Values[i] = ec._PublicFileLink_revokedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicFileLinkResolvedImplementors = []string{"PublicFileLinkResolved"}
+
+func (ec *executionContext) _PublicFileLinkResolved(ctx context.Context, sel ast.SelectionSet, obj *model.PublicFileLinkResolved) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicFileLinkResolvedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicFileLinkResolved")
+		case "token":
+			out.Values[i] = ec._PublicFileLinkResolved_token(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "file":
+			out.Values[i] = ec._PublicFileLinkResolved_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "owner":
+			out.Values[i] = ec._PublicFileLinkResolved_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._PublicFileLinkResolved_expiresAt(ctx, field, obj)
+		case "revoked":
+			out.Values[i] = ec._PublicFileLinkResolved_revoked(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicFolderLinkImplementors = []string{"PublicFolderLink"}
+
+func (ec *executionContext) _PublicFolderLink(ctx context.Context, sel ast.SelectionSet, obj *model.PublicFolderLink) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicFolderLinkImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicFolderLink")
+		case "folderId":
+			out.Values[i] = ec._PublicFolderLink_folderId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "token":
+			out.Values[i] = ec._PublicFolderLink_token(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._PublicFolderLink_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._PublicFolderLink_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._PublicFolderLink_expiresAt(ctx, field, obj)
+		case "revokedAt":
+			out.Values[i] = ec._PublicFolderLink_revokedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var publicFolderLinkResolvedImplementors = []string{"PublicFolderLinkResolved"}
+
+func (ec *executionContext) _PublicFolderLinkResolved(ctx context.Context, sel ast.SelectionSet, obj *model.PublicFolderLinkResolved) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, publicFolderLinkResolvedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PublicFolderLinkResolved")
+		case "token":
+			out.Values[i] = ec._PublicFolderLinkResolved_token(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "folder":
+			out.Values[i] = ec._PublicFolderLinkResolved_folder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "owner":
+			out.Values[i] = ec._PublicFolderLinkResolved_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._PublicFolderLinkResolved_expiresAt(ctx, field, obj)
+		case "revoked":
+			out.Values[i] = ec._PublicFolderLinkResolved_revoked(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -7963,6 +9607,44 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "resolvePublicFileLink":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_resolvePublicFileLink(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "resolvePublicFolderLink":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_resolvePublicFolderLink(ctx, field)
 				return res
 			}
 
@@ -9087,6 +10769,34 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋuseradityaaᚋgra
 	return ec._PageInfo(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNPublicFileLink2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFileLink(ctx context.Context, sel ast.SelectionSet, v model.PublicFileLink) graphql.Marshaler {
+	return ec._PublicFileLink(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPublicFileLink2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFileLink(ctx context.Context, sel ast.SelectionSet, v *model.PublicFileLink) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PublicFileLink(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPublicFolderLink2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFolderLink(ctx context.Context, sel ast.SelectionSet, v model.PublicFolderLink) graphql.Marshaler {
+	return ec._PublicFolderLink(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPublicFolderLink2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFolderLink(ctx context.Context, sel ast.SelectionSet, v *model.PublicFolderLink) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._PublicFolderLink(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNShareFileInput2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐShareFileInput(ctx context.Context, v any) (model.ShareFileInput, error) {
 	res, err := ec.unmarshalInputShareFileInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -9784,6 +11494,20 @@ func (ec *executionContext) unmarshalOPageInput2ᚖgithubᚗcomᚋuseradityaaᚋ
 	}
 	res, err := ec.unmarshalInputPageInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOPublicFileLinkResolved2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFileLinkResolved(ctx context.Context, sel ast.SelectionSet, v *model.PublicFileLinkResolved) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PublicFileLinkResolved(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOPublicFolderLinkResolved2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐPublicFolderLinkResolved(ctx context.Context, sel ast.SelectionSet, v *model.PublicFolderLinkResolved) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._PublicFolderLinkResolved(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {

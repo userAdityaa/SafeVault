@@ -64,6 +64,15 @@ type Mutation {
   shareFolder(input: ShareFolderInput!): FolderShare!
   unshareFile(fileId: ID!, sharedWithEmail: String!): Boolean!
   unshareFolder(folderId: ID!, sharedWithEmail: String!): Boolean!
+
+  # Public link mutations (owner only)
+  createPublicFileLink(fileId: ID!, expiresAt: String): PublicFileLink!
+  revokePublicFileLink(fileId: ID!): Boolean!
+  createPublicFolderLink(folderId: ID!, expiresAt: String): PublicFolderLink!
+  revokePublicFolderLink(folderId: ID!): Boolean!
+
+  # Add a publicly linked file into my storage (creates user_file mapping)
+  addPublicFileToMyStorage(token: String!): Boolean!
 }
 
 type User {
@@ -104,6 +113,10 @@ type Query {
   sharedFoldersWithMe: [SharedFolderWithMe!]!
   fileShares(fileId: ID!): [FileShare!]!
   folderShares(folderId: ID!): [FolderShare!]!
+
+  # Public link resolution (no auth required)
+  resolvePublicFileLink(token: String!): PublicFileLinkResolved
+  resolvePublicFolderLink(token: String!): PublicFolderLinkResolved
 }
 
 type StorageUsage {
@@ -216,4 +229,39 @@ input ShareFolderInput {
   emails: [String!]!
   permission: String! # viewer only
   expiresAt: String
+}
+
+# Public link types
+type PublicFileLink {
+  fileId: ID!
+  token: String!
+  url: String! # canonical public share URL path, client constructs full URL
+  createdAt: String!
+  expiresAt: String
+  revokedAt: String
+}
+
+type PublicFolderLink {
+  folderId: ID!
+  token: String!
+  url: String!
+  createdAt: String!
+  expiresAt: String
+  revokedAt: String
+}
+
+type PublicFileLinkResolved {
+  token: String!
+  file: File!
+  owner: User!
+  expiresAt: String
+  revoked: Boolean!
+}
+
+type PublicFolderLinkResolved {
+  token: String!
+  folder: Folder!
+  owner: User!
+  expiresAt: String
+  revoked: Boolean!
 }
