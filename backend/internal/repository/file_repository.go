@@ -28,6 +28,7 @@ type FileRepository interface {
 	GetUserAttributedUsage(ctx context.Context, userID uuid.UUID) (int64, error)
 	FindUserFileByHash(ctx context.Context, userID uuid.UUID, hash string) (*models.UserFile, error)
 	GetUserFileByFileID(ctx context.Context, userID, fileID uuid.UUID) (*models.UserFile, error)
+	GetOwnerByFileID(ctx context.Context, fileID uuid.UUID) (*models.UserFile, error)
 	MarkUserFileDeleted(ctx context.Context, userID, fileID uuid.UUID) error
 	GetDeletedUserFiles(ctx context.Context, userID uuid.UUID) ([]models.UserFile, error)
 	DeleteFileByID(ctx context.Context, fileID uuid.UUID) error
@@ -332,6 +333,34 @@ func (r *fileRepository) GetUserFileByFileID(ctx context.Context, userID, fileID
 			  LEFT JOIN google_users gu ON uf.user_id = gu.id
 			  WHERE uf.user_id=$1 AND uf.file_id=$2`
 	row := r.DB.QueryRow(ctx, query, userID, fileID)
+	var uf models.UserFile
+	var f models.File
+	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
+		&f.ID, &f.Hash, &f.StoragePath, &f.OriginalName, &f.MimeType, &f.Size, &f.RefCount, &f.Visibility, &f.CreatedAt,
+		&uf.UploaderEmail, &uf.UploaderName, &uf.UploaderPicture); err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, err
+	}
+	uf.File = f
+	return &uf, nil
+}
+
+// GetOwnerByFileID locates the owner of a file (user with role='owner')
+func (r *fileRepository) GetOwnerByFileID(ctx context.Context, fileID uuid.UUID) (*models.UserFile, error) {
+	query := `SELECT uf.id, uf.user_id, uf.file_id, uf.role, uf.uploaded_at, uf.folder_id,
+					 f.id, f.hash, f.storage_path, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
+					 COALESCE(u.email, gu.email, '') AS uploader_email,
+					 NULLIF(COALESCE(gu.name, ''), '') AS uploader_name,
+					 NULLIF(COALESCE(gu.picture, ''), '') AS uploader_picture
+			  FROM user_files uf
+			  JOIN files f ON uf.file_id=f.id
+			  LEFT JOIN users u ON uf.user_id = u.id
+			  LEFT JOIN google_users gu ON uf.user_id = gu.id
+			  WHERE uf.file_id=$1 AND uf.role='owner' 
+			  LIMIT 1`
+	row := r.DB.QueryRow(ctx, query, fileID)
 	var uf models.UserFile
 	var f models.File
 	if err := row.Scan(&uf.ID, &uf.UserID, &uf.FileID, &uf.Role, &uf.UploadedAt, &uf.FolderID,
