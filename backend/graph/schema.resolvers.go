@@ -7,6 +7,7 @@ package graph
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -732,9 +733,9 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 	}
 
 	// First try to get the file URL if user owns it
-	url, err := r.FileService.GetFileURL(ctx, userID, fid, in)
+	fileURL, err := r.FileService.GetFileURL(ctx, userID, fid, in)
 	if err == nil {
-		return url, nil
+		return fileURL, nil
 	}
 
 	// If user doesn't own the file, check if it's shared with them
@@ -752,8 +753,34 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 		return "", fmt.Errorf("unauthorized to access this file")
 	}
 
-	// User has access via sharing, generate URL directly
-	return r.FileService.GetSharedFileURL(ctx, fid, in)
+	// User has access via sharing; generate presigned URL directly (replicates former GetSharedFileURL logic)
+	file, err := r.FileService.FileRepo.GetByID(ctx, fid)
+	if err != nil {
+		return "", err
+	}
+	if file == nil {
+		return "", fmt.Errorf("file not found")
+	}
+	// Prepare response-content-disposition
+	dispType := "attachment"
+	if in {
+		dispType = "inline"
+	}
+	reqParams := url.Values{}
+	reqParams.Set("response-content-disposition", fmt.Sprintf("%s; filename=\"%s\"", dispType, file.OriginalName))
+
+	expiry := 10 * time.Minute
+	u, err := r.FileService.Minio.PresignedGetObject(ctx, r.FileService.Bucket, file.StoragePath, expiry, reqParams)
+	if err != nil {
+		return "", err
+	}
+	if r.FileService.PublicEndpoint != "" {
+		if base, perr := url.Parse(r.FileService.PublicEndpoint); perr == nil {
+			u.Scheme = base.Scheme
+			u.Host = base.Host
+		}
+	}
+	return u.String(), nil
 }
 
 // SearchMyFiles is the resolver for the searchMyFiles field.
