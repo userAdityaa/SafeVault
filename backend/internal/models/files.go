@@ -13,7 +13,7 @@ type File struct {
 	OriginalName string    `gorm:"not null"`
 	MimeType     string
 	Size         int64     `gorm:"not null"`
-	RefCount     int       `gorm:"default:1"`         // Number of users referencing
+	RefCount     int       `gorm:"default:0"`         // Number of users referencing
 	Visibility   string    `gorm:"default:'private'"` // private, public, shared
 	CreatedAt    time.Time `gorm:"autoCreateTime"`
 }

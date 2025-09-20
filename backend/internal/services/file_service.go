@@ -65,12 +65,7 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			return nil, err
 		}
 
-		// Validate MIME type against declared and filename extension
-		peek := buf.Bytes()
-		if len(peek) > 512 {
-			peek = peek[:512]
-		}
-		detected := http.DetectContentType(peek)
+		// Determine MIME type using declared type and filename extension
 		clean := func(s string) string {
 			if s == "" {
 				return s
@@ -80,19 +75,40 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			}
 			return strings.TrimSpace(strings.ToLower(s))
 		}
-		detectedBase := clean(detected)
+
 		declaredBase := clean(up.ContentType)
 		extMime := ""
 		if ext := strings.ToLower(path.Ext(up.Filename)); ext != "" {
 			extMime = clean(mime.TypeByExtension(ext))
 		}
-		// If declared is present and not generic, require match with detected
-		if declaredBase != "" && declaredBase != "application/octet-stream" && declaredBase != detectedBase {
-			return nil, fmt.Errorf("content-type mismatch: declared %s, detected %s", declaredBase, detectedBase)
+
+		// Determine final MIME type: prioritize declared, fallback to extension-based
+		finalMimeType := declaredBase
+		if finalMimeType == "" || finalMimeType == "application/octet-stream" {
+			if extMime != "" {
+				finalMimeType = extMime
+			} else {
+				// Only use http.DetectContentType as last resort for storage purposes
+				peek := buf.Bytes()
+				if len(peek) > 512 {
+					peek = peek[:512]
+				}
+				detected := http.DetectContentType(peek)
+				finalMimeType = clean(detected)
+			}
 		}
-		// If extension implies a type and it contradicts detection, reject
-		if extMime != "" && extMime != detectedBase {
-			return nil, fmt.Errorf("file extension does not match content: ext=%s, detected=%s", extMime, detectedBase)
+
+		// Basic validation: if both declared and extension exist, ensure they're compatible
+		if declaredBase != "" && extMime != "" && declaredBase != "application/octet-stream" {
+			// Allow some common compatible combinations
+			compatible := declaredBase == extMime ||
+				(declaredBase == "text/csv" && extMime == "text/plain") ||
+				(declaredBase == "text/plain" && extMime == "text/csv") ||
+				(strings.HasPrefix(declaredBase, "text/") && strings.HasPrefix(extMime, "text/"))
+
+			if !compatible {
+				return nil, fmt.Errorf("declared MIME type (%s) does not match file extension (%s)", declaredBase, extMime)
+			}
 		}
 		sum := sha256.Sum256(buf.Bytes())
 		hash := fmt.Sprintf("%x", sum[:])
@@ -135,7 +151,7 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			// Upload to MinIO and create file record
 			objectName := fmt.Sprintf("files/%s", hash)
 			reader := bytes.NewReader(buf.Bytes())
-			if _, err := s.Minio.PutObject(ctx, s.Bucket, objectName, reader, sizeBytes, minio.PutObjectOptions{ContentType: detectedBase}); err != nil {
+			if _, err := s.Minio.PutObject(ctx, s.Bucket, objectName, reader, sizeBytes, minio.PutObjectOptions{ContentType: finalMimeType}); err != nil {
 				return nil, err
 			}
 			dbFile = &models.File{
@@ -143,9 +159,9 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 				Hash:         hash,
 				StoragePath:  objectName,
 				OriginalName: up.Filename,
-				MimeType:     up.ContentType,
+				MimeType:     finalMimeType,
 				Size:         sizeBytes,
-				RefCount:     1,
+				RefCount:     0, // Start with 0, will be incremented when user mapping is created
 				Visibility:   "private",
 				CreatedAt:    time.Now(),
 			}
@@ -266,6 +282,33 @@ func (s *FileService) SoftDeleteUserFile(ctx context.Context, userID, fileID uui
 		return err
 	}
 	return s.FileRepo.MarkUserFileDeleted(ctx, userID, fileID)
+}
+
+// RecoverUserFile recovers a soft-deleted file
+func (s *FileService) RecoverUserFile(ctx context.Context, userID, fileID uuid.UUID) error {
+	if s == nil || s.FileRepo == nil {
+		return fmt.Errorf("file service not configured")
+	}
+	// ensure a deleted mapping exists
+	// Note: We check if there's a deleted mapping by trying to get it from deleted files
+	deletedFiles, err := s.FileRepo.GetDeletedUserFiles(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	found := false
+	for _, uf := range deletedFiles {
+		if uf.FileID == fileID {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("no deleted file found with ID %s", fileID.String())
+	}
+
+	return s.FileRepo.RecoverUserFile(ctx, userID, fileID)
 }
 
 // PurgeUserFile permanently removes the mapping and underlying object if unreferenced

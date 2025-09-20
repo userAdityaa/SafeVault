@@ -33,13 +33,13 @@ func NewUserRepository(db *pgxpool.Pool) UserRepository {
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	query :=
-		`SELECT id, email, password_hash
+		`SELECT id, email, password_hash, created_at
 	FROM users 
 	WHERE email=$1`
 	row := r.DB.QueryRow(ctx, query, email)
 
 	user := &models.User{}
-	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash)
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +78,14 @@ func (r *userRepository) CreateGoogleUser(ctx context.Context, user *models.Goog
 
 func (r *userRepository) FindByID(ctx context.Context, id string) (*models.User, error) {
 	query :=
-		`SELECT id, email, password_hash 
+		`SELECT id, email, password_hash, created_at
 	FROM users 
 	WHERE id=$1`
 	row := r.DB.QueryRow(ctx, query, id)
 
 	user := &models.User{}
 
-	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash)
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &user.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,7 @@ type FileRepository interface {
 	GetUserFileByFileID(ctx context.Context, userID, fileID uuid.UUID) (*models.UserFile, error)
 	GetOwnerByFileID(ctx context.Context, fileID uuid.UUID) (*models.UserFile, error)
 	MarkUserFileDeleted(ctx context.Context, userID, fileID uuid.UUID) error
+	RecoverUserFile(ctx context.Context, userID, fileID uuid.UUID) error
 	GetDeletedUserFiles(ctx context.Context, userID uuid.UUID) ([]models.UserFile, error)
 	DeleteFileByID(ctx context.Context, fileID uuid.UUID) error
 	GetUserFileMappingStatus(ctx context.Context, userID, fileID uuid.UUID) (status string, err error)
@@ -217,6 +218,22 @@ func (r *fileRepository) MarkUserFileDeleted(ctx context.Context, userID, fileID
 			SELECT id FROM user_files
 			WHERE user_id=$1 AND file_id=$2 AND deleted_at IS NULL
 			ORDER BY uploaded_at DESC
+			LIMIT 1
+		)
+	`, userID, fileID)
+	return err
+}
+
+// RecoverUserFile recovers a soft-deleted file by setting deleted_at to NULL
+func (r *fileRepository) RecoverUserFile(ctx context.Context, userID, fileID uuid.UUID) error {
+	// Recover only one (the most recent) deleted mapping
+	_, err := r.DB.Exec(ctx, `
+		UPDATE user_files uf
+		SET deleted_at = NULL
+		WHERE uf.id = (
+			SELECT id FROM user_files
+			WHERE user_id=$1 AND file_id=$2 AND deleted_at IS NOT NULL
+			ORDER BY deleted_at DESC
 			LIMIT 1
 		)
 	`, userID, fileID)
