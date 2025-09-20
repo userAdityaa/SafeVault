@@ -27,8 +27,9 @@ func (r *mutationResolver) Signup(ctx context.Context, input model.SignupInput) 
 	return &model.AuthPayload{
 		Token: token,
 		User: &model.User{
-			ID:    user.ID.String(),
-			Email: user.Email,
+			ID:      user.ID.String(),
+			Email:   user.Email,
+			IsAdmin: r.AuthService.IsAdmin(user.Email),
 		},
 	}, nil
 }
@@ -43,8 +44,9 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	return &model.AuthPayload{
 		Token: token,
 		User: &model.User{
-			ID:    user.ID.String(),
-			Email: user.Email,
+			ID:      user.ID.String(),
+			Email:   user.Email,
+			IsAdmin: r.AuthService.IsAdmin(user.Email),
 		},
 	}, nil
 }
@@ -63,6 +65,7 @@ func (r *mutationResolver) GoogleLogin(ctx context.Context, input model.GoogleLo
 			Email:   user.Email,
 			Name:    &user.Name,
 			Picture: &user.Picture,
+			IsAdmin: r.AuthService.IsAdmin(user.Email),
 		},
 	}, nil
 }
@@ -1446,6 +1449,140 @@ func (r *queryResolver) PublicFolderFiles(ctx context.Context, token string) ([]
 				Name:    &file.UploaderName,
 				Picture: &file.UploaderPicture,
 			},
+		})
+	}
+
+	return result, nil
+}
+
+// AdminAllUsers is the resolver for the adminAllUsers field.
+// AdminAllUsers is the resolver for the adminAllUsers field.
+func (r *queryResolver) AdminAllUsers(ctx context.Context) ([]*model.AdminUserInfo, error) {
+	// Check if user is admin
+	isAdmin := middleware.GetIsAdminFromContext(ctx)
+	if !isAdmin {
+		return nil, fmt.Errorf("unauthorized: admin access required")
+	}
+
+	// Get all users from admin service
+	users, err := r.AdminService.GetAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL model
+	var result []*model.AdminUserInfo
+	for _, user := range users {
+		result = append(result, &model.AdminUserInfo{
+			ID:           user.ID.String(),
+			Email:        user.Email,
+			Name:         &user.Name,
+			Picture:      &user.Picture,
+			CreatedAt:    user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    user.UpdatedAt.Format(time.RFC3339),
+			TotalFiles:   user.TotalFiles,
+			TotalFolders: user.TotalFolders,
+			StorageUsed:  int(user.StorageUsed),
+		})
+	}
+
+	return result, nil
+}
+
+// AdminUserFiles is the resolver for the adminUserFiles field.
+func (r *queryResolver) AdminUserFiles(ctx context.Context, userID string) ([]*model.UserFile, error) {
+	// Check if user is admin
+	isAdmin := middleware.GetIsAdminFromContext(ctx)
+	if !isAdmin {
+		return nil, fmt.Errorf("unauthorized: admin access required")
+	}
+
+	// Parse userID
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	// Get user files from admin service
+	userFiles, err := r.AdminService.GetUserFiles(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL model (similar pattern to MyFiles resolver)
+	var result []*model.UserFile
+	for _, uf := range userFiles {
+		var namePtr *string
+		if uf.UploaderName != "" {
+			n := uf.UploaderName
+			namePtr = &n
+		}
+		var picturePtr *string
+		if uf.UploaderPicture != "" {
+			p := uf.UploaderPicture
+			picturePtr = &p
+		}
+
+		result = append(result, &model.UserFile{
+			ID:         uf.ID.String(),
+			UserID:     uf.UserID.String(),
+			FileID:     uf.FileID.String(),
+			UploadedAt: uf.UploadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           uf.File.ID.String(),
+				Hash:         uf.File.Hash,
+				OriginalName: uf.File.OriginalName,
+				MimeType:     uf.File.MimeType,
+				Size:         int(uf.File.Size),
+				RefCount:     uf.File.RefCount,
+				Visibility:   uf.File.Visibility,
+				CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+			},
+			Uploader: &model.Uploader{
+				Email:   uf.UploaderEmail,
+				Name:    namePtr,
+				Picture: picturePtr,
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// AdminUserFolders is the resolver for the adminUserFolders field.
+func (r *queryResolver) AdminUserFolders(ctx context.Context, userID string) ([]*model.Folder, error) {
+	// Check if user is admin
+	isAdmin := middleware.GetIsAdminFromContext(ctx)
+	if !isAdmin {
+		return nil, fmt.Errorf("unauthorized: admin access required")
+	}
+
+	// Parse userID
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	// Get user folders from admin service
+	folders, err := r.AdminService.GetUserFolders(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL model
+	var result []*model.Folder
+	for _, folder := range folders {
+		var parentIDPtr *string
+		if folder.ParentID != nil {
+			p := folder.ParentID.String()
+			parentIDPtr = &p
+		}
+
+		result = append(result, &model.Folder{
+			ID:        folder.ID.String(),
+			Name:      folder.Name,
+			ParentID:  parentIDPtr,
+			CreatedAt: folder.CreatedAt.Format(time.RFC3339),
 		})
 	}
 

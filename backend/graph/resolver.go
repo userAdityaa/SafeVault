@@ -9,4 +9,5 @@ type Resolver struct {
 	FolderService     *services.FolderService
 	ShareService      *services.ShareService
 	PublicLinkService *services.PublicLinkService
+	AdminService      *services.AdminService
 }

@@ -82,6 +82,19 @@ type User {
   picture: String
   createdAt: String!
   updatedAt: String!
+  isAdmin: Boolean!
+}
+
+type AdminUserInfo {
+  id: ID!
+  email: String!
+  name: String
+  picture: String
+  createdAt: String!
+  updatedAt: String!
+  totalFiles: Int!
+  totalFolders: Int!
+  storageUsed: Int!
 }
 
 """
@@ -119,6 +132,11 @@ type Query {
   resolvePublicFileLink(token: String!): PublicFileLinkResolved
   resolvePublicFolderLink(token: String!): PublicFolderLinkResolved
   publicFolderFiles(token: String!): [UserFile!]!
+
+  # Admin queries (admin only)
+  adminAllUsers: [AdminUserInfo!]!
+  adminUserFiles(userId: ID!): [UserFile!]!
+  adminUserFolders(userId: ID!): [Folder!]!
 }
 
 type StorageUsage {

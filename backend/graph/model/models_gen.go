@@ -6,6 +6,18 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+type AdminUserInfo struct {
+	ID           string  `json:"id"`
+	Email        string  `json:"email"`
+	Name         *string `json:"name,omitempty"`
+	Picture      *string `json:"picture,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
+	UpdatedAt    string  `json:"updatedAt"`
+	TotalFiles   int     `json:"totalFiles"`
+	TotalFolders int     `json:"totalFolders"`
+	StorageUsed  int     `json:"storageUsed"`
+}
+
 type AuthPayload struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
@@ -195,6 +207,7 @@ type User struct {
 	Picture   *string `json:"picture,omitempty"`
 	CreatedAt string  `json:"createdAt"`
 	UpdatedAt string  `json:"updatedAt"`
+	IsAdmin   bool    `json:"isAdmin"`
 }
 
 type UserFile struct {
