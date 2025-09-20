@@ -45,6 +45,7 @@ func main() {
 	fileRepo := repository.NewFileRepository(db)
 	folderRepo := repository.NewFolderRepository(db)
 	shareRepo := repository.NewShareRepository(db)
+	publicLinkRepo := repository.NewPublicLinkRepository(db)
 
 	folderService := services.NewFolderService(folderRepo)
 
@@ -89,17 +90,19 @@ func main() {
 		fileService = services.NewFileService(fileRepo, minioClient, minioBucket, minioPublic)
 	}
 
-	// Create share service
+	// Create services
 	shareService := services.NewShareService(shareRepo, userRepo, fileRepo, folderRepo)
+	publicLinkService := services.NewPublicLinkService(publicLinkRepo, shareRepo, userRepo, fileRepo, folderRepo)
 
 	// Create GraphQL server
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			AuthService:   &authService,
-			GoogleService: &googleService,
-			FileService:   fileService,
-			FolderService: folderService,
-			ShareService:  shareService,
+			AuthService:       &authService,
+			GoogleService:     &googleService,
+			FileService:       fileService,
+			FolderService:     folderService,
+			ShareService:      shareService,
+			PublicLinkService: publicLinkService,
 		},
 	}))
 
