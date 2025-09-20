@@ -44,9 +44,13 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 	return &model.AuthPayload{
 		Token: token,
 		User: &model.User{
-			ID:      user.ID.String(),
-			Email:   user.Email,
-			IsAdmin: r.AuthService.IsAdmin(user.Email),
+			ID:        user.ID.String(),
+			Email:     user.Email,
+			Name:      nil, // Regular users don't have names in the database
+			Picture:   nil, // Regular users don't have profile pictures
+			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: user.CreatedAt.Format(time.RFC3339), // Use CreatedAt as UpdatedAt for regular users
+			IsAdmin:   r.AuthService.IsAdmin(user.Email),
 		},
 	}, nil
 }
@@ -61,11 +65,13 @@ func (r *mutationResolver) GoogleLogin(ctx context.Context, input model.GoogleLo
 	return &model.AuthPayload{
 		Token: token,
 		User: &model.User{
-			ID:      user.ID.String(),
-			Email:   user.Email,
-			Name:    &user.Name,
-			Picture: &user.Picture,
-			IsAdmin: r.AuthService.IsAdmin(user.Email),
+			ID:        user.ID.String(),
+			Email:     user.Email,
+			Name:      &user.Name,
+			Picture:   &user.Picture,
+			CreatedAt: user.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: user.UpdatedAt.Format(time.RFC3339),
+			IsAdmin:   r.AuthService.IsAdmin(user.Email),
 		},
 	}, nil
 }
@@ -162,6 +168,29 @@ func (r *mutationResolver) DeleteFile(ctx context.Context, fileID string) (bool,
 		return false, fmt.Errorf("file service not configured")
 	}
 	if err := r.FileService.SoftDeleteUserFile(ctx, userID, fid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// RecoverFile is the resolver for the recoverFile field.
+func (r *mutationResolver) RecoverFile(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	fid, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+	if r.FileService == nil {
+		return false, fmt.Errorf("file service not configured")
+	}
+	if err := r.FileService.RecoverUserFile(ctx, userID, fid); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -618,6 +647,29 @@ func (r *mutationResolver) AddPublicFileToMyStorage(ctx context.Context, token s
 		return false, fmt.Errorf("link invalid or revoked")
 	}
 	if err := r.PublicLinkService.AddPublicFileToStorage(ctx, userID, f.ID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// TrackFileActivity is the resolver for the trackFileActivity field.
+func (r *mutationResolver) TrackFileActivity(ctx context.Context, fileID string, activityType string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+	fid, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+	if r.FileActivityService == nil {
+		return false, fmt.Errorf("file activity service not configured")
+	}
+	if err := r.FileActivityService.TrackFileActivity(ctx, userID, fid, activityType); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1862,6 +1914,63 @@ func (r *queryResolver) MySharedFileDownloads(ctx context.Context) ([]*model.Fil
 	}
 
 	return result, nil
+}
+
+// MyRecentFileActivities is the resolver for the myRecentFileActivities field.
+func (r *queryResolver) MyRecentFileActivities(ctx context.Context, limit *int) ([]*model.RecentFileActivity, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+
+	if r.FileActivityService == nil {
+		return nil, fmt.Errorf("file activity service not configured")
+	}
+
+	limitVal := 10 // default
+	if limit != nil && *limit > 0 {
+		limitVal = *limit
+	}
+
+	activities, err := r.FileActivityService.GetRecentFileActivities(ctx, userID, limitVal)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL models and populate file data
+	var gqlActivities []*model.RecentFileActivity
+	for _, activity := range activities {
+		// Get file data
+		file, err := r.FileService.FileRepo.GetByID(ctx, activity.FileID)
+		if err != nil {
+			continue // skip files that can't be found
+		}
+
+		gqlActivity := &model.RecentFileActivity{
+			FileID:           activity.FileID.String(),
+			UserID:           activity.UserID.String(),
+			LastActivityType: activity.LastActivityType,
+			LastActivityAt:   activity.LastActivityAt.Format(time.RFC3339),
+			ActivityCount:    activity.ActivityCount,
+			File: &model.File{
+				ID:           file.ID.String(),
+				Hash:         file.Hash,
+				OriginalName: file.OriginalName,
+				MimeType:     file.MimeType,
+				Size:         int(file.Size),
+				RefCount:     int(file.RefCount),
+				Visibility:   file.Visibility,
+				CreatedAt:    file.CreatedAt.Format(time.RFC3339),
+			},
+		}
+		gqlActivities = append(gqlActivities, gqlActivity)
+	}
+
+	return gqlActivities, nil
 }
 
 // Mutation returns MutationResolver implementation.

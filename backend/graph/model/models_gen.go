@@ -34,6 +34,16 @@ type File struct {
 	CreatedAt    string `json:"createdAt"`
 }
 
+type FileActivity struct {
+	ID           string `json:"id"`
+	FileID       string `json:"fileId"`
+	UserID       string `json:"userId"`
+	ActivityType string `json:"activityType"`
+	ActivityAt   string `json:"activityAt"`
+	File         *File  `json:"file"`
+	User         *User  `json:"user"`
+}
+
 type FileDownload struct {
 	ID             string  `json:"id"`
 	FileID         string  `json:"fileId"`
@@ -163,6 +173,15 @@ type PublicFolderLinkResolved struct {
 }
 
 type Query struct {
+}
+
+type RecentFileActivity struct {
+	FileID           string `json:"fileId"`
+	UserID           string `json:"userId"`
+	LastActivityType string `json:"lastActivityType"`
+	LastActivityAt   string `json:"lastActivityAt"`
+	ActivityCount    int    `json:"activityCount"`
+	File             *File  `json:"file"`
 }
 
 type ShareFileInput struct {

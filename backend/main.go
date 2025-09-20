@@ -97,6 +97,10 @@ func main() {
 	adminService := services.NewAdminService(userRepo, fileRepo, folderRepo)
 	fileDownloadService := services.NewFileDownloadService(fileDownloadRepo, fileRepo, shareRepo)
 
+	// Initialize file activity repository and service
+	fileActivityRepo := repository.NewFileActivityRepository(db)
+	fileActivityService := services.NewFileActivityService(fileActivityRepo, fileRepo)
+
 	// Create GraphQL server
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
@@ -108,6 +112,7 @@ func main() {
 			PublicLinkService:   publicLinkService,
 			AdminService:        adminService,
 			FileDownloadService: fileDownloadService,
+			FileActivityService: fileActivityService,
 		},
 	}))
 

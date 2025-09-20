@@ -75,6 +75,16 @@ type ComplexityRoot struct {
 		Visibility   func(childComplexity int) int
 	}
 
+	FileActivity struct {
+		ActivityAt   func(childComplexity int) int
+		ActivityType func(childComplexity int) int
+		File         func(childComplexity int) int
+		FileID       func(childComplexity int) int
+		ID           func(childComplexity int) int
+		User         func(childComplexity int) int
+		UserID       func(childComplexity int) int
+	}
+
 	FileDownload struct {
 		DownloadType   func(childComplexity int) int
 		DownloadedAt   func(childComplexity int) int
@@ -147,12 +157,14 @@ type ComplexityRoot struct {
 		Login                    func(childComplexity int, input model.LoginInput) int
 		MoveUserFile             func(childComplexity int, mappingID string, folderID *string) int
 		PurgeFile                func(childComplexity int, fileID string) int
+		RecoverFile              func(childComplexity int, fileID string) int
 		RenameFolder             func(childComplexity int, folderID string, newName string) int
 		RevokePublicFileLink     func(childComplexity int, fileID string) int
 		RevokePublicFolderLink   func(childComplexity int, folderID string) int
 		ShareFile                func(childComplexity int, input model.ShareFileInput) int
 		ShareFolder              func(childComplexity int, input model.ShareFolderInput) int
 		Signup                   func(childComplexity int, input model.SignupInput) int
+		TrackFileActivity        func(childComplexity int, fileID string, activityType string) int
 		UnshareFile              func(childComplexity int, fileID string, sharedWithEmail string) int
 		UnshareFolder            func(childComplexity int, folderID string, sharedWithEmail string) int
 		UploadFiles              func(childComplexity int, input model.UploadFileInput) int
@@ -212,6 +224,7 @@ type ComplexityRoot struct {
 		MyFiles                 func(childComplexity int) int
 		MyFolderFiles           func(childComplexity int, folderID *string) int
 		MyFolders               func(childComplexity int, parentID *string) int
+		MyRecentFileActivities  func(childComplexity int, limit *int) int
 		MySharedFileDownloads   func(childComplexity int) int
 		MyStorage               func(childComplexity int) int
 		PublicFolderFiles       func(childComplexity int, token string) int
@@ -221,6 +234,15 @@ type ComplexityRoot struct {
 		SharedFilesWithMe       func(childComplexity int) int
 		SharedFolderFiles       func(childComplexity int, folderID string) int
 		SharedFoldersWithMe     func(childComplexity int) int
+	}
+
+	RecentFileActivity struct {
+		ActivityCount    func(childComplexity int) int
+		File             func(childComplexity int) int
+		FileID           func(childComplexity int) int
+		LastActivityAt   func(childComplexity int) int
+		LastActivityType func(childComplexity int) int
+		UserID           func(childComplexity int) int
 	}
 
 	SharedFileWithMe struct {
@@ -296,6 +318,7 @@ type MutationResolver interface {
 	GoogleLogin(ctx context.Context, input model.GoogleLoginInput) (*model.AuthPayload, error)
 	UploadFiles(ctx context.Context, input model.UploadFileInput) ([]*model.UserFile, error)
 	DeleteFile(ctx context.Context, fileID string) (bool, error)
+	RecoverFile(ctx context.Context, fileID string) (bool, error)
 	PurgeFile(ctx context.Context, fileID string) (bool, error)
 	CreateFolder(ctx context.Context, name string, parentID *string) (*model.Folder, error)
 	RenameFolder(ctx context.Context, folderID string, newName string) (bool, error)
@@ -310,6 +333,7 @@ type MutationResolver interface {
 	CreatePublicFolderLink(ctx context.Context, folderID string, expiresAt *string) (*model.PublicFolderLink, error)
 	RevokePublicFolderLink(ctx context.Context, folderID string) (bool, error)
 	AddPublicFileToMyStorage(ctx context.Context, token string) (bool, error)
+	TrackFileActivity(ctx context.Context, fileID string, activityType string) (bool, error)
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
@@ -335,6 +359,7 @@ type QueryResolver interface {
 	AdminFileDownloadStats(ctx context.Context) ([]*model.FileDownloadStats, error)
 	MyFileDownloads(ctx context.Context, fileID string) ([]*model.FileDownload, error)
 	MySharedFileDownloads(ctx context.Context) ([]*model.FileDownload, error)
+	MyRecentFileActivities(ctx context.Context, limit *int) ([]*model.RecentFileActivity, error)
 }
 
 type executableSchema struct {
@@ -472,6 +497,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.File.Visibility(childComplexity), true
+
+	case "FileActivity.activityAt":
+		if e.complexity.FileActivity.ActivityAt == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.ActivityAt(childComplexity), true
+	case "FileActivity.activityType":
+		if e.complexity.FileActivity.ActivityType == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.ActivityType(childComplexity), true
+	case "FileActivity.file":
+		if e.complexity.FileActivity.File == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.File(childComplexity), true
+	case "FileActivity.fileId":
+		if e.complexity.FileActivity.FileID == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.FileID(childComplexity), true
+	case "FileActivity.id":
+		if e.complexity.FileActivity.ID == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.ID(childComplexity), true
+	case "FileActivity.user":
+		if e.complexity.FileActivity.User == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.User(childComplexity), true
+	case "FileActivity.userId":
+		if e.complexity.FileActivity.UserID == nil {
+			break
+		}
+
+		return e.complexity.FileActivity.UserID(childComplexity), true
 
 	case "FileDownload.downloadType":
 		if e.complexity.FileDownload.DownloadType == nil {
@@ -864,6 +932,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.PurgeFile(childComplexity, args["fileId"].(string)), true
+	case "Mutation.recoverFile":
+		if e.complexity.Mutation.RecoverFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_recoverFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.RecoverFile(childComplexity, args["fileId"].(string)), true
 	case "Mutation.renameFolder":
 		if e.complexity.Mutation.RenameFolder == nil {
 			break
@@ -930,6 +1009,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Signup(childComplexity, args["input"].(model.SignupInput)), true
+	case "Mutation.trackFileActivity":
+		if e.complexity.Mutation.TrackFileActivity == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_trackFileActivity_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.TrackFileActivity(childComplexity, args["fileId"].(string), args["activityType"].(string)), true
 	case "Mutation.unshareFile":
 		if e.complexity.Mutation.UnshareFile == nil {
 			break
@@ -1242,6 +1332,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyFolders(childComplexity, args["parentId"].(*string)), true
+	case "Query.myRecentFileActivities":
+		if e.complexity.Query.MyRecentFileActivities == nil {
+			break
+		}
+
+		args, err := ec.field_Query_myRecentFileActivities_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MyRecentFileActivities(childComplexity, args["limit"].(*int)), true
 	case "Query.mySharedFileDownloads":
 		if e.complexity.Query.MySharedFileDownloads == nil {
 			break
@@ -1321,6 +1422,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.SharedFoldersWithMe(childComplexity), true
+
+	case "RecentFileActivity.activityCount":
+		if e.complexity.RecentFileActivity.ActivityCount == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.ActivityCount(childComplexity), true
+	case "RecentFileActivity.file":
+		if e.complexity.RecentFileActivity.File == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.File(childComplexity), true
+	case "RecentFileActivity.fileId":
+		if e.complexity.RecentFileActivity.FileID == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.FileID(childComplexity), true
+	case "RecentFileActivity.lastActivityAt":
+		if e.complexity.RecentFileActivity.LastActivityAt == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.LastActivityAt(childComplexity), true
+	case "RecentFileActivity.lastActivityType":
+		if e.complexity.RecentFileActivity.LastActivityType == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.LastActivityType(childComplexity), true
+	case "RecentFileActivity.userId":
+		if e.complexity.RecentFileActivity.UserID == nil {
+			break
+		}
+
+		return e.complexity.RecentFileActivity.UserID(childComplexity), true
 
 	case "SharedFileWithMe.file":
 		if e.complexity.SharedFileWithMe.File == nil {
@@ -1844,6 +1982,17 @@ func (ec *executionContext) field_Mutation_purgeFile_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_recoverFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_renameFolder_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1912,6 +2061,22 @@ func (ec *executionContext) field_Mutation_signup_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_trackFileActivity_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "activityType", ec.unmarshalNString2string)
+	if err != nil {
+		return nil, err
+	}
+	args["activityType"] = arg1
 	return args, nil
 }
 
@@ -2070,6 +2235,17 @@ func (ec *executionContext) field_Query_myFolders_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["parentId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_myRecentFileActivities_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg0
 	return args, nil
 }
 
@@ -2747,6 +2923,243 @@ func (ec *executionContext) fieldContext_File_createdAt(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_id(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_fileId(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_fileId,
+		func(ctx context.Context) (any, error) {
+			return obj.FileID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_fileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_userId(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_activityType(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_activityType,
+		func(ctx context.Context) (any, error) {
+			return obj.ActivityType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_activityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_activityAt(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_activityAt,
+		func(ctx context.Context) (any, error) {
+			return obj.ActivityAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_activityAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_file(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileActivity_user(ctx context.Context, field graphql.CollectedField, obj *model.FileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileActivity_user,
+		func(ctx context.Context) (any, error) {
+			return obj.User, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileActivity_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
 	}
 	return fc, nil
@@ -4499,6 +4912,47 @@ func (ec *executionContext) fieldContext_Mutation_deleteFile(ctx context.Context
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_recoverFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_recoverFile,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().RecoverFile(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_recoverFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_recoverFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_purgeFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5153,6 +5607,47 @@ func (ec *executionContext) fieldContext_Mutation_addPublicFileToMyStorage(ctx c
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_addPublicFileToMyStorage_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_trackFileActivity(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_trackFileActivity,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().TrackFileActivity(ctx, fc.Args["fileId"].(string), fc.Args["activityType"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_trackFileActivity(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_trackFileActivity_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -7086,6 +7581,61 @@ func (ec *executionContext) fieldContext_Query_mySharedFileDownloads(_ context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_myRecentFileActivities(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myRecentFileActivities,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().MyRecentFileActivities(ctx, fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNRecentFileActivity2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐRecentFileActivityᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myRecentFileActivities(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "fileId":
+				return ec.fieldContext_RecentFileActivity_fileId(ctx, field)
+			case "userId":
+				return ec.fieldContext_RecentFileActivity_userId(ctx, field)
+			case "lastActivityType":
+				return ec.fieldContext_RecentFileActivity_lastActivityType(ctx, field)
+			case "lastActivityAt":
+				return ec.fieldContext_RecentFileActivity_lastActivityAt(ctx, field)
+			case "activityCount":
+				return ec.fieldContext_RecentFileActivity_activityCount(ctx, field)
+			case "file":
+				return ec.fieldContext_RecentFileActivity_file(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RecentFileActivity", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_myRecentFileActivities_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7189,6 +7739,198 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_fileId(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_fileId,
+		func(ctx context.Context) (any, error) {
+			return obj.FileID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_fileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_userId(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_lastActivityType(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_lastActivityType,
+		func(ctx context.Context) (any, error) {
+			return obj.LastActivityType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_lastActivityType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_lastActivityAt(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_lastActivityAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastActivityAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_lastActivityAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_activityCount(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_activityCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ActivityCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_activityCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RecentFileActivity_file(ctx context.Context, field graphql.CollectedField, obj *model.RecentFileActivity) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RecentFileActivity_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RecentFileActivity_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RecentFileActivity",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
 		},
 	}
 	return fc, nil
@@ -10504,6 +11246,75 @@ func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj
 	return out
 }
 
+var fileActivityImplementors = []string{"FileActivity"}
+
+func (ec *executionContext) _FileActivity(ctx context.Context, sel ast.SelectionSet, obj *model.FileActivity) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fileActivityImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FileActivity")
+		case "id":
+			out.Values[i] = ec._FileActivity_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fileId":
+			out.Values[i] = ec._FileActivity_fileId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._FileActivity_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "activityType":
+			out.Values[i] = ec._FileActivity_activityType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "activityAt":
+			out.Values[i] = ec._FileActivity_activityAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "file":
+			out.Values[i] = ec._FileActivity_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "user":
+			out.Values[i] = ec._FileActivity_user(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var fileDownloadImplementors = []string{"FileDownload"}
 
 func (ec *executionContext) _FileDownload(ctx context.Context, sel ast.SelectionSet, obj *model.FileDownload) graphql.Marshaler {
@@ -10925,6 +11736,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "recoverFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_recoverFile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "purgeFile":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_purgeFile(ctx, field)
@@ -11019,6 +11837,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "addPublicFileToMyStorage":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_addPublicFileToMyStorage(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "trackFileActivity":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_trackFileActivity(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11831,6 +12656,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myRecentFileActivities":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myRecentFileActivities(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -11839,6 +12686,70 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var recentFileActivityImplementors = []string{"RecentFileActivity"}
+
+func (ec *executionContext) _RecentFileActivity(ctx context.Context, sel ast.SelectionSet, obj *model.RecentFileActivity) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, recentFileActivityImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RecentFileActivity")
+		case "fileId":
+			out.Values[i] = ec._RecentFileActivity_fileId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._RecentFileActivity_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastActivityType":
+			out.Values[i] = ec._RecentFileActivity_lastActivityType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastActivityAt":
+			out.Values[i] = ec._RecentFileActivity_lastActivityAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "activityCount":
+			out.Values[i] = ec._RecentFileActivity_activityCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "file":
+			out.Values[i] = ec._RecentFileActivity_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13139,6 +14050,60 @@ func (ec *executionContext) marshalNPublicFolderLink2ᚖgithubᚗcomᚋuseradity
 		return graphql.Null
 	}
 	return ec._PublicFolderLink(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRecentFileActivity2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐRecentFileActivityᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.RecentFileActivity) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRecentFileActivity2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐRecentFileActivity(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRecentFileActivity2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐRecentFileActivity(ctx context.Context, sel ast.SelectionSet, v *model.RecentFileActivity) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RecentFileActivity(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNShareFileInput2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐShareFileInput(ctx context.Context, v any) (model.ShareFileInput, error) {

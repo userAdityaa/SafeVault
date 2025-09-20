@@ -51,6 +51,7 @@ type Mutation {
 
   uploadFiles(input: UploadFileInput!): [UserFile!]!
   deleteFile(fileId: ID!): Boolean!
+  recoverFile(fileId: ID!): Boolean!
   purgeFile(fileId: ID!): Boolean!
 
   # Folder mutations
@@ -73,6 +74,9 @@ type Mutation {
 
   # Add a publicly linked file into my storage (creates user_file mapping)
   addPublicFileToMyStorage(token: String!): Boolean!
+
+  # File activity tracking mutations
+  trackFileActivity(fileId: ID!, activityType: String!): Boolean!
 }
 
 type User {
@@ -142,6 +146,9 @@ type Query {
   # Download tracking queries (owner only)
   myFileDownloads(fileId: ID!): [FileDownload!]!
   mySharedFileDownloads: [FileDownload!]!
+
+  # File activity tracking queries
+  myRecentFileActivities(limit: Int): [RecentFileActivity!]!
 }
 
 type StorageUsage {
@@ -316,4 +323,24 @@ type FileDownloadStats {
   lastDownloadAt: String
   file: File!
   owner: User!
+}
+
+# File activity tracking types
+type FileActivity {
+  id: ID!
+  fileId: ID!
+  userId: ID!
+  activityType: String! # "preview" or "download"
+  activityAt: String!
+  file: File!
+  user: User!
+}
+
+type RecentFileActivity {
+  fileId: ID!
+  userId: ID!
+  lastActivityType: String!
+  lastActivityAt: String!
+  activityCount: Int!
+  file: File!
 }
