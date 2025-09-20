@@ -914,10 +914,12 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 	// First try to get the file URL if user owns it
 	fileURL, err := r.FileService.GetFileURL(ctx, userID, fid, in)
 	if err == nil {
+		fmt.Printf("DEBUG: User %s owns file %s, returning direct URL (no tracking)\n", userID, fid)
 		return fileURL, nil
 	}
 
 	// If user doesn't own the file, check if it's shared with them
+	fmt.Printf("DEBUG: User %s doesn't own file %s, checking for shared access\n", userID, fid)
 	userEmail, err := r.ShareService.UserRepo.GetUserEmailByID(ctx, userIDStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to get user email: %w", err)
@@ -932,6 +934,8 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 		return "", fmt.Errorf("unauthorized to access this file")
 	}
 
+	fmt.Printf("DEBUG: User %s has shared access to file %s, proceeding with download tracking\n", userID, fid)
+
 	// User has access via sharing; generate presigned URL directly (replicates former GetSharedFileURL logic)
 	file, err := r.FileService.FileRepo.GetByID(ctx, fid)
 	if err != nil {
@@ -940,6 +944,39 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 	if file == nil {
 		return "", fmt.Errorf("file not found")
 	}
+
+	// Track the download for shared files
+	// Get the owner ID of the file first
+	ownerUserFile, err := r.FileService.FileRepo.GetOwnerByFileID(ctx, fid)
+	if err == nil && ownerUserFile != nil && r.FileDownloadService != nil {
+		// Record the download tracking (fire and forget, don't fail if tracking fails)
+		go func() {
+			// Validate that the downloader and owner are different to avoid self-downloads
+			if userID != ownerUserFile.UserID {
+				fmt.Printf("TRACKING: Recording download - File: %s, Owner: %s, Downloader: %s\n", fid, ownerUserFile.UserID, userID)
+				err := r.FileDownloadService.DownloadRepo.RecordDownload(context.Background(), fid, ownerUserFile.UserID, &userID, "shared", "", "GraphQL", "GraphQL-Client")
+				if err != nil {
+					// Log error but don't fail the request - tracking is not critical
+					fmt.Printf("WARNING: Failed to record download tracking: %v\n", err)
+				} else {
+					fmt.Printf("SUCCESS: Download recorded successfully\n")
+				}
+			} else {
+				fmt.Printf("SKIPPING: Owner downloading their own file - File: %s, User: %s\n", fid, userID)
+			}
+		}()
+	} else {
+		if err != nil {
+			fmt.Printf("ERROR: Failed to get file owner: %v\n", err)
+		}
+		if ownerUserFile == nil {
+			fmt.Printf("ERROR: Owner user file is nil for file: %s\n", fid)
+		}
+		if r.FileDownloadService == nil {
+			fmt.Printf("ERROR: FileDownloadService is nil\n")
+		}
+	}
+
 	// Prepare response-content-disposition
 	dispType := "attachment"
 	if in {
@@ -1343,6 +1380,26 @@ func (r *queryResolver) ResolvePublicFileLink(ctx context.Context, token string)
 	if revoked || f == nil || owner == nil {
 		return &model.PublicFileLinkResolved{Token: token, Revoked: true}, nil
 	}
+
+	// Track the download for public links (assuming resolution indicates download intent)
+	if r.FileDownloadService != nil {
+		// Try to get user ID from context (might be nil for anonymous access)
+		var downloadedBy *uuid.UUID
+		if userIDStr, ok := middleware.GetUserIDFromContext(ctx); ok {
+			if userID, err := uuid.Parse(userIDStr); err == nil {
+				downloadedBy = &userID
+			}
+		}
+
+		// Record the download tracking (fire and forget, don't fail if tracking fails)
+		go func() {
+			err := r.FileDownloadService.DownloadRepo.RecordDownload(context.Background(), f.ID, owner.ID, downloadedBy, "public", token, "", "")
+			if err != nil {
+				fmt.Printf("WARNING: Failed to record public download tracking: %v\n", err)
+			}
+		}()
+	}
+
 	var expStr *string
 	if expiresAt != nil {
 		s := expiresAt.Format(time.RFC3339)
@@ -1583,6 +1640,224 @@ func (r *queryResolver) AdminUserFolders(ctx context.Context, userID string) ([]
 			Name:      folder.Name,
 			ParentID:  parentIDPtr,
 			CreatedAt: folder.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
+}
+
+// AdminFileDownloadStats is the resolver for the adminFileDownloadStats field.
+func (r *queryResolver) AdminFileDownloadStats(ctx context.Context) ([]*model.FileDownloadStats, error) {
+	// Check if user is admin
+	isAdmin := middleware.GetIsAdminFromContext(ctx)
+	if !isAdmin {
+		return nil, fmt.Errorf("unauthorized: admin access required")
+	}
+
+	// Get download stats from service
+	stats, err := r.FileDownloadService.GetAllFileDownloadStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL model
+	var result []*model.FileDownloadStats
+	for _, stat := range stats {
+		var lastDownloadAt *string
+		if stat.LastDownloadAt != nil {
+			formatted := stat.LastDownloadAt.Format(time.RFC3339)
+			lastDownloadAt = &formatted
+		}
+
+		result = append(result, &model.FileDownloadStats{
+			FileID:          stat.FileID.String(),
+			OwnerID:         stat.OwnerID.String(),
+			TotalDownloads:  int(stat.TotalDownloads),
+			SharedDownloads: int(stat.SharedDownloads),
+			PublicDownloads: int(stat.PublicDownloads),
+			LastDownloadAt:  lastDownloadAt,
+			File: &model.File{
+				ID:           stat.File.ID.String(),
+				Hash:         stat.File.Hash,
+				OriginalName: stat.File.OriginalName,
+				MimeType:     stat.File.MimeType,
+				Size:         int(stat.File.Size),
+				RefCount:     stat.File.RefCount,
+				Visibility:   stat.File.Visibility,
+				CreatedAt:    stat.File.CreatedAt.Format(time.RFC3339),
+			},
+			Owner: &model.User{
+				ID:        stat.Owner.ID.String(),
+				Email:     stat.Owner.Email,
+				CreatedAt: stat.Owner.CreatedAt.Format(time.RFC3339),
+				IsAdmin:   r.AuthService.IsAdmin(stat.Owner.Email),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// MyFileDownloads is the resolver for the myFileDownloads field.
+func (r *queryResolver) MyFileDownloads(ctx context.Context, fileID string) ([]*model.FileDownload, error) {
+	// Get user ID from context
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	// Parse user ID
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	// Parse file ID
+	fid, err := uuid.Parse(fileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file ID")
+	}
+
+	// Get downloads from service
+	downloads, err := r.FileDownloadService.GetFileDownloads(ctx, userID, fid)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to GraphQL model
+	var result []*model.FileDownload
+	for _, download := range downloads {
+		var downloadedBy *string
+		if download.DownloadedBy != nil {
+			d := download.DownloadedBy.String()
+			downloadedBy = &d
+		}
+
+		var shareToken *string
+		if download.ShareToken != nil {
+			shareToken = download.ShareToken
+		}
+
+		var downloadedUser *model.User
+		if download.DownloadedUser != nil {
+			downloadedUser = &model.User{
+				ID:        download.DownloadedUser.ID.String(),
+				Email:     download.DownloadedUser.Email,
+				CreatedAt: download.DownloadedUser.CreatedAt.Format(time.RFC3339),
+				IsAdmin:   r.AuthService.IsAdmin(download.DownloadedUser.Email),
+			}
+		}
+
+		result = append(result, &model.FileDownload{
+			ID:           download.ID.String(),
+			FileID:       download.FileID.String(),
+			DownloadedBy: downloadedBy,
+			OwnerID:      download.OwnerID.String(),
+			DownloadType: download.DownloadType,
+			ShareToken:   shareToken,
+			IPAddress:    download.IPAddress,
+			UserAgent:    download.UserAgent,
+			DownloadedAt: download.DownloadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           download.File.ID.String(),
+				Hash:         download.File.Hash,
+				OriginalName: download.File.OriginalName,
+				MimeType:     download.File.MimeType,
+				Size:         int(download.File.Size),
+				RefCount:     download.File.RefCount,
+				Visibility:   download.File.Visibility,
+				CreatedAt:    download.File.CreatedAt.Format(time.RFC3339),
+			},
+			DownloadedUser: downloadedUser,
+			Owner: &model.User{
+				ID:        download.Owner.ID.String(),
+				Email:     download.Owner.Email,
+				CreatedAt: download.Owner.CreatedAt.Format(time.RFC3339),
+				IsAdmin:   r.AuthService.IsAdmin(download.Owner.Email),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// MySharedFileDownloads is the resolver for the mySharedFileDownloads field.
+func (r *queryResolver) MySharedFileDownloads(ctx context.Context) ([]*model.FileDownload, error) {
+	// Get user ID from context
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	// Parse user ID
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	fmt.Printf("DEBUG: MySharedFileDownloads called by user: %s\n", userID)
+
+	// Get downloads from service
+	fmt.Printf("DEBUG: Getting shared file downloads for user: %s\n", userID)
+	downloads, err := r.FileDownloadService.GetMySharedFileDownloads(ctx, userID)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to get shared file downloads: %v\n", err)
+		return nil, err
+	}
+
+	fmt.Printf("DEBUG: Found %d downloads in database for user %s\n", len(downloads), userID)
+
+	// Convert to GraphQL model
+	var result []*model.FileDownload
+	for _, download := range downloads {
+		var downloadedBy *string
+		if download.DownloadedBy != nil {
+			d := download.DownloadedBy.String()
+			downloadedBy = &d
+		}
+
+		var shareToken *string
+		if download.ShareToken != nil {
+			shareToken = download.ShareToken
+		}
+
+		var downloadedUser *model.User
+		if download.DownloadedUser != nil {
+			downloadedUser = &model.User{
+				ID:        download.DownloadedUser.ID.String(),
+				Email:     download.DownloadedUser.Email,
+				CreatedAt: download.DownloadedUser.CreatedAt.Format(time.RFC3339),
+				IsAdmin:   r.AuthService.IsAdmin(download.DownloadedUser.Email),
+			}
+		}
+
+		result = append(result, &model.FileDownload{
+			ID:           download.ID.String(),
+			FileID:       download.FileID.String(),
+			DownloadedBy: downloadedBy,
+			OwnerID:      download.OwnerID.String(),
+			DownloadType: download.DownloadType,
+			ShareToken:   shareToken,
+			IPAddress:    download.IPAddress,
+			UserAgent:    download.UserAgent,
+			DownloadedAt: download.DownloadedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           download.File.ID.String(),
+				Hash:         download.File.Hash,
+				OriginalName: download.File.OriginalName,
+				MimeType:     download.File.MimeType,
+				Size:         int(download.File.Size),
+				RefCount:     download.File.RefCount,
+				Visibility:   download.File.Visibility,
+				CreatedAt:    download.File.CreatedAt.Format(time.RFC3339),
+			},
+			DownloadedUser: downloadedUser,
+			Owner: &model.User{
+				ID:        download.Owner.ID.String(),
+				Email:     download.Owner.Email,
+				CreatedAt: download.Owner.CreatedAt.Format(time.RFC3339),
+				IsAdmin:   r.AuthService.IsAdmin(download.Owner.Email),
+			},
 		})
 	}
 

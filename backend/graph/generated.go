@@ -75,6 +75,32 @@ type ComplexityRoot struct {
 		Visibility   func(childComplexity int) int
 	}
 
+	FileDownload struct {
+		DownloadType   func(childComplexity int) int
+		DownloadedAt   func(childComplexity int) int
+		DownloadedBy   func(childComplexity int) int
+		DownloadedUser func(childComplexity int) int
+		File           func(childComplexity int) int
+		FileID         func(childComplexity int) int
+		ID             func(childComplexity int) int
+		IPAddress      func(childComplexity int) int
+		Owner          func(childComplexity int) int
+		OwnerID        func(childComplexity int) int
+		ShareToken     func(childComplexity int) int
+		UserAgent      func(childComplexity int) int
+	}
+
+	FileDownloadStats struct {
+		File            func(childComplexity int) int
+		FileID          func(childComplexity int) int
+		LastDownloadAt  func(childComplexity int) int
+		Owner           func(childComplexity int) int
+		OwnerID         func(childComplexity int) int
+		PublicDownloads func(childComplexity int) int
+		SharedDownloads func(childComplexity int) int
+		TotalDownloads  func(childComplexity int) int
+	}
+
 	FileShare struct {
 		ExpiresAt       func(childComplexity int) int
 		File            func(childComplexity int) int
@@ -173,6 +199,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		AdminAllUsers           func(childComplexity int) int
+		AdminFileDownloadStats  func(childComplexity int) int
 		AdminUserFiles          func(childComplexity int, userID string) int
 		AdminUserFolders        func(childComplexity int, userID string) int
 		FileShares              func(childComplexity int, fileID string) int
@@ -181,9 +208,11 @@ type ComplexityRoot struct {
 		FolderShares            func(childComplexity int, folderID string) int
 		Health                  func(childComplexity int) int
 		MyDeletedFiles          func(childComplexity int) int
+		MyFileDownloads         func(childComplexity int, fileID string) int
 		MyFiles                 func(childComplexity int) int
 		MyFolderFiles           func(childComplexity int, folderID *string) int
 		MyFolders               func(childComplexity int, parentID *string) int
+		MySharedFileDownloads   func(childComplexity int) int
 		MyStorage               func(childComplexity int) int
 		PublicFolderFiles       func(childComplexity int, token string) int
 		ResolvePublicFileLink   func(childComplexity int, token string) int
@@ -303,6 +332,9 @@ type QueryResolver interface {
 	AdminAllUsers(ctx context.Context) ([]*model.AdminUserInfo, error)
 	AdminUserFiles(ctx context.Context, userID string) ([]*model.UserFile, error)
 	AdminUserFolders(ctx context.Context, userID string) ([]*model.Folder, error)
+	AdminFileDownloadStats(ctx context.Context) ([]*model.FileDownloadStats, error)
+	MyFileDownloads(ctx context.Context, fileID string) ([]*model.FileDownload, error)
+	MySharedFileDownloads(ctx context.Context) ([]*model.FileDownload, error)
 }
 
 type executableSchema struct {
@@ -440,6 +472,128 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.File.Visibility(childComplexity), true
+
+	case "FileDownload.downloadType":
+		if e.complexity.FileDownload.DownloadType == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.DownloadType(childComplexity), true
+	case "FileDownload.downloadedAt":
+		if e.complexity.FileDownload.DownloadedAt == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.DownloadedAt(childComplexity), true
+	case "FileDownload.downloadedBy":
+		if e.complexity.FileDownload.DownloadedBy == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.DownloadedBy(childComplexity), true
+	case "FileDownload.downloadedUser":
+		if e.complexity.FileDownload.DownloadedUser == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.DownloadedUser(childComplexity), true
+	case "FileDownload.file":
+		if e.complexity.FileDownload.File == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.File(childComplexity), true
+	case "FileDownload.fileId":
+		if e.complexity.FileDownload.FileID == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.FileID(childComplexity), true
+	case "FileDownload.id":
+		if e.complexity.FileDownload.ID == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.ID(childComplexity), true
+	case "FileDownload.ipAddress":
+		if e.complexity.FileDownload.IPAddress == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.IPAddress(childComplexity), true
+	case "FileDownload.owner":
+		if e.complexity.FileDownload.Owner == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.Owner(childComplexity), true
+	case "FileDownload.ownerId":
+		if e.complexity.FileDownload.OwnerID == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.OwnerID(childComplexity), true
+	case "FileDownload.shareToken":
+		if e.complexity.FileDownload.ShareToken == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.ShareToken(childComplexity), true
+	case "FileDownload.userAgent":
+		if e.complexity.FileDownload.UserAgent == nil {
+			break
+		}
+
+		return e.complexity.FileDownload.UserAgent(childComplexity), true
+
+	case "FileDownloadStats.file":
+		if e.complexity.FileDownloadStats.File == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.File(childComplexity), true
+	case "FileDownloadStats.fileId":
+		if e.complexity.FileDownloadStats.FileID == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.FileID(childComplexity), true
+	case "FileDownloadStats.lastDownloadAt":
+		if e.complexity.FileDownloadStats.LastDownloadAt == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.LastDownloadAt(childComplexity), true
+	case "FileDownloadStats.owner":
+		if e.complexity.FileDownloadStats.Owner == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.Owner(childComplexity), true
+	case "FileDownloadStats.ownerId":
+		if e.complexity.FileDownloadStats.OwnerID == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.OwnerID(childComplexity), true
+	case "FileDownloadStats.publicDownloads":
+		if e.complexity.FileDownloadStats.PublicDownloads == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.PublicDownloads(childComplexity), true
+	case "FileDownloadStats.sharedDownloads":
+		if e.complexity.FileDownloadStats.SharedDownloads == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.SharedDownloads(childComplexity), true
+	case "FileDownloadStats.totalDownloads":
+		if e.complexity.FileDownloadStats.TotalDownloads == nil {
+			break
+		}
+
+		return e.complexity.FileDownloadStats.TotalDownloads(childComplexity), true
 
 	case "FileShare.expiresAt":
 		if e.complexity.FileShare.ExpiresAt == nil {
@@ -965,6 +1119,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.AdminAllUsers(childComplexity), true
+	case "Query.adminFileDownloadStats":
+		if e.complexity.Query.AdminFileDownloadStats == nil {
+			break
+		}
+
+		return e.complexity.Query.AdminFileDownloadStats(childComplexity), true
 	case "Query.adminUserFiles":
 		if e.complexity.Query.AdminUserFiles == nil {
 			break
@@ -1043,6 +1203,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyDeletedFiles(childComplexity), true
+	case "Query.myFileDownloads":
+		if e.complexity.Query.MyFileDownloads == nil {
+			break
+		}
+
+		args, err := ec.field_Query_myFileDownloads_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.MyFileDownloads(childComplexity, args["fileId"].(string)), true
 	case "Query.myFiles":
 		if e.complexity.Query.MyFiles == nil {
 			break
@@ -1071,6 +1242,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MyFolders(childComplexity, args["parentId"].(*string)), true
+	case "Query.mySharedFileDownloads":
+		if e.complexity.Query.MySharedFileDownloads == nil {
+			break
+		}
+
+		return e.complexity.Query.MySharedFileDownloads(childComplexity), true
 	case "Query.myStorage":
 		if e.complexity.Query.MyStorage == nil {
 			break
@@ -1863,6 +2040,17 @@ func (ec *executionContext) field_Query_folderShares_args(ctx context.Context, r
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_myFileDownloads_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_myFolderFiles_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2559,6 +2747,670 @@ func (ec *executionContext) fieldContext_File_createdAt(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_id(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_fileId(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_fileId,
+		func(ctx context.Context) (any, error) {
+			return obj.FileID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_fileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_downloadedBy(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_downloadedBy,
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadedBy, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_downloadedBy(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_ownerId(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_ownerId,
+		func(ctx context.Context) (any, error) {
+			return obj.OwnerID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_ownerId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_downloadType(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_downloadType,
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_downloadType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_shareToken(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_shareToken,
+		func(ctx context.Context) (any, error) {
+			return obj.ShareToken, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_shareToken(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_ipAddress(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_ipAddress,
+		func(ctx context.Context) (any, error) {
+			return obj.IPAddress, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_ipAddress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_userAgent(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_userAgent,
+		func(ctx context.Context) (any, error) {
+			return obj.UserAgent, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_userAgent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_downloadedAt(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_downloadedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_downloadedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_file(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_downloadedUser(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_downloadedUser,
+		func(ctx context.Context) (any, error) {
+			return obj.DownloadedUser, nil
+		},
+		nil,
+		ec.marshalOUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_downloadedUser(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownload_owner(ctx context.Context, field graphql.CollectedField, obj *model.FileDownload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownload_owner,
+		func(ctx context.Context) (any, error) {
+			return obj.Owner, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownload_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownload",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_fileId(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_fileId,
+		func(ctx context.Context) (any, error) {
+			return obj.FileID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_fileId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_ownerId(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_ownerId,
+		func(ctx context.Context) (any, error) {
+			return obj.OwnerID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_ownerId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_totalDownloads(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_totalDownloads,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalDownloads, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_totalDownloads(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_sharedDownloads(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_sharedDownloads,
+		func(ctx context.Context) (any, error) {
+			return obj.SharedDownloads, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_sharedDownloads(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_publicDownloads(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_publicDownloads,
+		func(ctx context.Context) (any, error) {
+			return obj.PublicDownloads, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_publicDownloads(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_lastDownloadAt(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_lastDownloadAt,
+		func(ctx context.Context) (any, error) {
+			return obj.LastDownloadAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_lastDownloadAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_file(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FileDownloadStats_owner(ctx context.Context, field graphql.CollectedField, obj *model.FileDownloadStats) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FileDownloadStats_owner,
+		func(ctx context.Context) (any, error) {
+			return obj.Owner, nil
+		},
+		nil,
+		ec.marshalNUser2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐUser,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FileDownloadStats_owner(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FileDownloadStats",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_User_id(ctx, field)
+			case "email":
+				return ec.fieldContext_User_email(ctx, field)
+			case "name":
+				return ec.fieldContext_User_name(ctx, field)
+			case "picture":
+				return ec.fieldContext_User_picture(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_User_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "isAdmin":
+				return ec.fieldContext_User_isAdmin(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
 		},
 	}
 	return fc, nil
@@ -6065,6 +6917,175 @@ func (ec *executionContext) fieldContext_Query_adminUserFolders(ctx context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_adminFileDownloadStats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_adminFileDownloadStats,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().AdminFileDownloadStats(ctx)
+		},
+		nil,
+		ec.marshalNFileDownloadStats2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadStatsᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_adminFileDownloadStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "fileId":
+				return ec.fieldContext_FileDownloadStats_fileId(ctx, field)
+			case "ownerId":
+				return ec.fieldContext_FileDownloadStats_ownerId(ctx, field)
+			case "totalDownloads":
+				return ec.fieldContext_FileDownloadStats_totalDownloads(ctx, field)
+			case "sharedDownloads":
+				return ec.fieldContext_FileDownloadStats_sharedDownloads(ctx, field)
+			case "publicDownloads":
+				return ec.fieldContext_FileDownloadStats_publicDownloads(ctx, field)
+			case "lastDownloadAt":
+				return ec.fieldContext_FileDownloadStats_lastDownloadAt(ctx, field)
+			case "file":
+				return ec.fieldContext_FileDownloadStats_file(ctx, field)
+			case "owner":
+				return ec.fieldContext_FileDownloadStats_owner(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FileDownloadStats", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myFileDownloads(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myFileDownloads,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().MyFileDownloads(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNFileDownload2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myFileDownloads(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FileDownload_id(ctx, field)
+			case "fileId":
+				return ec.fieldContext_FileDownload_fileId(ctx, field)
+			case "downloadedBy":
+				return ec.fieldContext_FileDownload_downloadedBy(ctx, field)
+			case "ownerId":
+				return ec.fieldContext_FileDownload_ownerId(ctx, field)
+			case "downloadType":
+				return ec.fieldContext_FileDownload_downloadType(ctx, field)
+			case "shareToken":
+				return ec.fieldContext_FileDownload_shareToken(ctx, field)
+			case "ipAddress":
+				return ec.fieldContext_FileDownload_ipAddress(ctx, field)
+			case "userAgent":
+				return ec.fieldContext_FileDownload_userAgent(ctx, field)
+			case "downloadedAt":
+				return ec.fieldContext_FileDownload_downloadedAt(ctx, field)
+			case "file":
+				return ec.fieldContext_FileDownload_file(ctx, field)
+			case "downloadedUser":
+				return ec.fieldContext_FileDownload_downloadedUser(ctx, field)
+			case "owner":
+				return ec.fieldContext_FileDownload_owner(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FileDownload", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_myFileDownloads_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_mySharedFileDownloads(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_mySharedFileDownloads,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MySharedFileDownloads(ctx)
+		},
+		nil,
+		ec.marshalNFileDownload2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_mySharedFileDownloads(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_FileDownload_id(ctx, field)
+			case "fileId":
+				return ec.fieldContext_FileDownload_fileId(ctx, field)
+			case "downloadedBy":
+				return ec.fieldContext_FileDownload_downloadedBy(ctx, field)
+			case "ownerId":
+				return ec.fieldContext_FileDownload_ownerId(ctx, field)
+			case "downloadType":
+				return ec.fieldContext_FileDownload_downloadType(ctx, field)
+			case "shareToken":
+				return ec.fieldContext_FileDownload_shareToken(ctx, field)
+			case "ipAddress":
+				return ec.fieldContext_FileDownload_ipAddress(ctx, field)
+			case "userAgent":
+				return ec.fieldContext_FileDownload_userAgent(ctx, field)
+			case "downloadedAt":
+				return ec.fieldContext_FileDownload_downloadedAt(ctx, field)
+			case "file":
+				return ec.fieldContext_FileDownload_file(ctx, field)
+			case "downloadedUser":
+				return ec.fieldContext_FileDownload_downloadedUser(ctx, field)
+			case "owner":
+				return ec.fieldContext_FileDownload_owner(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FileDownload", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9483,6 +10504,162 @@ func (ec *executionContext) _File(ctx context.Context, sel ast.SelectionSet, obj
 	return out
 }
 
+var fileDownloadImplementors = []string{"FileDownload"}
+
+func (ec *executionContext) _FileDownload(ctx context.Context, sel ast.SelectionSet, obj *model.FileDownload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fileDownloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FileDownload")
+		case "id":
+			out.Values[i] = ec._FileDownload_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fileId":
+			out.Values[i] = ec._FileDownload_fileId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadedBy":
+			out.Values[i] = ec._FileDownload_downloadedBy(ctx, field, obj)
+		case "ownerId":
+			out.Values[i] = ec._FileDownload_ownerId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadType":
+			out.Values[i] = ec._FileDownload_downloadType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "shareToken":
+			out.Values[i] = ec._FileDownload_shareToken(ctx, field, obj)
+		case "ipAddress":
+			out.Values[i] = ec._FileDownload_ipAddress(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userAgent":
+			out.Values[i] = ec._FileDownload_userAgent(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadedAt":
+			out.Values[i] = ec._FileDownload_downloadedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "file":
+			out.Values[i] = ec._FileDownload_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadedUser":
+			out.Values[i] = ec._FileDownload_downloadedUser(ctx, field, obj)
+		case "owner":
+			out.Values[i] = ec._FileDownload_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var fileDownloadStatsImplementors = []string{"FileDownloadStats"}
+
+func (ec *executionContext) _FileDownloadStats(ctx context.Context, sel ast.SelectionSet, obj *model.FileDownloadStats) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, fileDownloadStatsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FileDownloadStats")
+		case "fileId":
+			out.Values[i] = ec._FileDownloadStats_fileId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ownerId":
+			out.Values[i] = ec._FileDownloadStats_ownerId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalDownloads":
+			out.Values[i] = ec._FileDownloadStats_totalDownloads(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sharedDownloads":
+			out.Values[i] = ec._FileDownloadStats_sharedDownloads(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "publicDownloads":
+			out.Values[i] = ec._FileDownloadStats_publicDownloads(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastDownloadAt":
+			out.Values[i] = ec._FileDownloadStats_lastDownloadAt(ctx, field, obj)
+		case "file":
+			out.Values[i] = ec._FileDownloadStats_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "owner":
+			out.Values[i] = ec._FileDownloadStats_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var fileShareImplementors = []string{"FileShare"}
 
 func (ec *executionContext) _FileShare(ctx context.Context, sel ast.SelectionSet, obj *model.FileShare) graphql.Marshaler {
@@ -10588,6 +11765,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "adminFileDownloadStats":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_adminFileDownloadStats(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myFileDownloads":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myFileDownloads(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "mySharedFileDownloads":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_mySharedFileDownloads(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -11513,6 +12756,114 @@ func (ec *executionContext) marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraph�
 		return graphql.Null
 	}
 	return ec._File(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFileDownload2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FileDownload) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFileDownload2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownload(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFileDownload2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownload(ctx context.Context, sel ast.SelectionSet, v *model.FileDownload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FileDownload(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFileDownloadStats2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadStatsᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FileDownloadStats) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFileDownloadStats2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadStats(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFileDownloadStats2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileDownloadStats(ctx context.Context, sel ast.SelectionSet, v *model.FileDownloadStats) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FileDownloadStats(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFileSearchFilter2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFileSearchFilter(ctx context.Context, v any) (model.FileSearchFilter, error) {

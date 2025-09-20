@@ -34,6 +34,32 @@ type File struct {
 	CreatedAt    string `json:"createdAt"`
 }
 
+type FileDownload struct {
+	ID             string  `json:"id"`
+	FileID         string  `json:"fileId"`
+	DownloadedBy   *string `json:"downloadedBy,omitempty"`
+	OwnerID        string  `json:"ownerId"`
+	DownloadType   string  `json:"downloadType"`
+	ShareToken     *string `json:"shareToken,omitempty"`
+	IPAddress      string  `json:"ipAddress"`
+	UserAgent      string  `json:"userAgent"`
+	DownloadedAt   string  `json:"downloadedAt"`
+	File           *File   `json:"file"`
+	DownloadedUser *User   `json:"downloadedUser,omitempty"`
+	Owner          *User   `json:"owner"`
+}
+
+type FileDownloadStats struct {
+	FileID          string  `json:"fileId"`
+	OwnerID         string  `json:"ownerId"`
+	TotalDownloads  int     `json:"totalDownloads"`
+	SharedDownloads int     `json:"sharedDownloads"`
+	PublicDownloads int     `json:"publicDownloads"`
+	LastDownloadAt  *string `json:"lastDownloadAt,omitempty"`
+	File            *File   `json:"file"`
+	Owner           *User   `json:"owner"`
+}
+
 type FileSearchFilter struct {
 	Filename      *string  `json:"filename,omitempty"`
 	MimeTypes     []string `json:"mimeTypes,omitempty"`

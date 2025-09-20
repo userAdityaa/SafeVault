@@ -137,6 +137,11 @@ type Query {
   adminAllUsers: [AdminUserInfo!]!
   adminUserFiles(userId: ID!): [UserFile!]!
   adminUserFolders(userId: ID!): [Folder!]!
+  adminFileDownloadStats: [FileDownloadStats!]!
+
+  # Download tracking queries (owner only)
+  myFileDownloads(fileId: ID!): [FileDownload!]!
+  mySharedFileDownloads: [FileDownload!]!
 }
 
 type StorageUsage {
@@ -284,4 +289,31 @@ type PublicFolderLinkResolved {
   owner: User!
   expiresAt: String
   revoked: Boolean!
+}
+
+# Download tracking types
+type FileDownload {
+  id: ID!
+  fileId: ID!
+  downloadedBy: ID
+  ownerId: ID!
+  downloadType: String! # "shared" or "public"
+  shareToken: String
+  ipAddress: String!
+  userAgent: String!
+  downloadedAt: String!
+  file: File!
+  downloadedUser: User
+  owner: User!
+}
+
+type FileDownloadStats {
+  fileId: ID!
+  ownerId: ID!
+  totalDownloads: Int!
+  sharedDownloads: Int!
+  publicDownloads: Int!
+  lastDownloadAt: String
+  file: File!
+  owner: User!
 }
