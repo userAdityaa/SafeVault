@@ -12,4 +12,5 @@ type GoogleUser struct {
 	Name      string    `gorm:"default:''"`
 	Picture   string    `gorm:"default:''"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
