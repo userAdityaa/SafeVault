@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/useradityaa/internal/auth"
+	"github.com/useradityaa/internal/config"
 	"github.com/useradityaa/internal/models"
 	"github.com/useradityaa/internal/repository"
 )
@@ -26,9 +27,9 @@ func (s *GoogleService) LoginWithGoogle(ctx context.Context, idToken string) (*m
 	user, err := s.UserRepo.FindByGoogleMail(ctx, email)
 	if err != nil {
 		newUser := &models.GoogleUser{
-			ID:    uuid.New(),
-			Email: email,
-			Name: name,
+			ID:      uuid.New(),
+			Email:   email,
+			Name:    name,
 			Picture: picture,
 		}
 		if err := s.UserRepo.CreateGoogleUser(ctx, newUser); err != nil {
@@ -44,7 +45,9 @@ func (s *GoogleService) LoginWithGoogle(ctx context.Context, idToken string) (*m
 		}
 	}
 
-	token, err := auth.GenerateJWT(user.ID.String())
+	cfg := config.Load()
+	isAdmin := cfg.AdminEmail != "" && cfg.AdminEmail == email
+	token, err := auth.GenerateJWT(user.ID.String(), isAdmin)
 	if err != nil {
 		return nil, "", err
 	}

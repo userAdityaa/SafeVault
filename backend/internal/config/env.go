@@ -23,6 +23,7 @@ type Config struct {
 	MinioPublicURL string
 
 	GoogleClientID string
+	AdminEmail     string
 }
 
 var (
@@ -48,6 +49,7 @@ func Load() *Config {
 			MinioBucket:    getEnv("MINIO_BUCKET", ""),
 			MinioPublicURL: getEnv("MINIO_PUBLIC_ENDPOINT", ""),
 			GoogleClientID: getEnv("GOOGLE_CLIENT_ID", ""),
+			AdminEmail:     getEnv("ADMIN_EMAIL", ""),
 		}
 	})
 	return cfg

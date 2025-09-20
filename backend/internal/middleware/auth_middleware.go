@@ -12,6 +12,7 @@ import (
 type contextKey string
 
 const userIDContextKey contextKey = "userId"
+const isAdminContextKey contextKey = "isAdmin"
 
 // AuthMiddleware validates the Authorization: Bearer <token> header.
 // On success, it injects the `userId` from the token into the request context
@@ -30,13 +31,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		userID, err := auth.VerifyJWT(parts[1])
+		userID, isAdmin, err := auth.VerifyJWT(parts[1])
 		if err != nil {
 			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), userIDContextKey, userID)
+		ctx = context.WithValue(ctx, isAdminContextKey, isAdmin)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -48,4 +50,13 @@ func GetUserIDFromContext(ctx context.Context) (string, bool) {
 		return id, true
 	}
 	return "", false
+}
+
+// GetIsAdminFromContext retrieves the admin status set by AuthMiddleware.
+func GetIsAdminFromContext(ctx context.Context) bool {
+	val := ctx.Value(isAdminContextKey)
+	if isAdmin, ok := val.(bool); ok {
+		return isAdmin
+	}
+	return false
 }

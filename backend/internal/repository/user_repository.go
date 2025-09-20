@@ -18,6 +18,9 @@ type UserRepository interface {
 	// New methods for sharing
 	FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error) // returns user, userType, error
 	GetUserEmailByID(ctx context.Context, userID string) (string, error)
+
+	// Admin methods
+	GetAllUsers(ctx context.Context) ([]*models.AdminUserInfo, error)
 }
 
 type userRepository struct {
@@ -126,4 +129,74 @@ func (r *userRepository) GetUserEmailByID(ctx context.Context, userID string) (s
 	query = `SELECT email FROM google_users WHERE id = $1`
 	err = r.DB.QueryRow(ctx, query, userID).Scan(&email)
 	return email, err
+}
+
+// GetAllUsers returns admin information for all users
+func (r *userRepository) GetAllUsers(ctx context.Context) ([]*models.AdminUserInfo, error) {
+	query := `
+		WITH user_stats AS (
+			SELECT 
+				u.id,
+				u.email,
+				'' as name,
+				'' as picture,
+				u.created_at,
+				u.created_at as updated_at,
+				COALESCE(COUNT(DISTINCT uf.id), 0) as total_files,
+				COALESCE(COUNT(DISTINCT f.id), 0) as total_folders,
+				COALESCE(SUM(file.size), 0) as storage_used
+			FROM users u
+			LEFT JOIN user_files uf ON u.id = uf.user_id AND uf.deleted_at IS NULL
+			LEFT JOIN files file ON uf.file_id = file.id
+			LEFT JOIN folders f ON u.id = f.user_id
+			GROUP BY u.id, u.email, u.created_at
+		UNION ALL
+			SELECT 
+				gu.id,
+				gu.email,
+				COALESCE(gu.name, '') as name,
+				COALESCE(gu.picture, '') as picture,
+				COALESCE(gu.created_at, NOW()) as created_at,
+				COALESCE(gu.updated_at, NOW()) as updated_at,
+				COALESCE(COUNT(DISTINCT uf.id), 0) as total_files,
+				COALESCE(COUNT(DISTINCT f.id), 0) as total_folders,
+				COALESCE(SUM(file.size), 0) as storage_used
+			FROM google_users gu
+			LEFT JOIN user_files uf ON gu.id = uf.user_id AND uf.deleted_at IS NULL
+			LEFT JOIN files file ON uf.file_id = file.id
+			LEFT JOIN folders f ON gu.id = f.user_id
+			GROUP BY gu.id, gu.email, gu.name, gu.picture, gu.created_at, gu.updated_at
+		)
+		SELECT id, email, name, picture, created_at, updated_at, total_files, total_folders, storage_used
+		FROM user_stats
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.DB.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.AdminUserInfo
+	for rows.Next() {
+		user := &models.AdminUserInfo{}
+		err := rows.Scan(
+			&user.ID,
+			&user.Email,
+			&user.Name,
+			&user.Picture,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.TotalFiles,
+			&user.TotalFolders,
+			&user.StorageUsed,
+		)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
 }

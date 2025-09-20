@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/useradityaa/internal/auth"
+	"github.com/useradityaa/internal/config"
 	"github.com/useradityaa/internal/models"
 	"github.com/useradityaa/internal/repository"
 )
@@ -34,7 +35,8 @@ func (s *AuthService) Signup(ctx context.Context, email, password string) (*mode
 		return nil, "", err
 	}
 
-	token, err := auth.GenerateJWT(user.ID.String())
+	isAdmin := s.IsAdmin(user.Email)
+	token, err := auth.GenerateJWT(user.ID.String(), isAdmin)
 	if err != nil {
 		return nil, "", err
 	}
@@ -53,10 +55,16 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*model
 		return nil, "", errors.New("Invalid email or password")
 	}
 
-	token, err := auth.GenerateJWT(user.ID.String())
+	isAdmin := s.IsAdmin(user.Email)
+	token, err := auth.GenerateJWT(user.ID.String(), isAdmin)
 	if err != nil {
 		return nil, "", err
 	}
 
 	return user, token, nil
+}
+
+func (s *AuthService) IsAdmin(email string) bool {
+	cfg := config.Load()
+	return cfg.AdminEmail != "" && cfg.AdminEmail == email
 }
