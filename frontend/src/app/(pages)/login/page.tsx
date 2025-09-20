@@ -6,12 +6,15 @@ import { loginSchema } from "@/schema/auth";
 import { toast, Toaster } from "sonner";
 import { GoogleLogin } from "@react-oauth/google";
 import Loader from "@/app/components/Loader";
+import { GRAPHQL_ENDPOINT } from "@/lib/backend";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -45,13 +48,14 @@ export default function Login() {
             email
             name
             picture
+            isAdmin
           }
         }
       }
     `;
 
     try {
-      const response = await fetch("http://localhost:8080/query", {
+      const response = await fetch(GRAPHQL_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -81,8 +85,19 @@ export default function Login() {
           name: result.data.login.user.name || result.data.login.user.email,
           picture: result.data.login.user.picture || "",
           isGoogle: false,
+          isAdmin: result.data.login.user.isAdmin || false,
         })
       );
+
+      // Use auth context login function
+      login(result.data.login.token, {
+        id: result.data.login.user.id,
+        email: result.data.login.user.email,
+        name: result.data.login.user.name || result.data.login.user.email,
+        picture: result.data.login.user.picture || "",
+        isGoogle: false,
+        isAdmin: result.data.login.user.isAdmin || false,
+      });
 
       setForm({ email: "", password: "" });
 
@@ -116,12 +131,13 @@ export default function Login() {
               email
               name
               picture
+              isAdmin
             }
           }
         }
       `;
 
-      const res = await fetch("http://localhost:8080/query", {
+      const res = await fetch(GRAPHQL_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -130,7 +146,7 @@ export default function Login() {
         }),
       });
 
-  const result = await res.json();
+      const result = await res.json();
 
       if (result.errors && result.errors.length > 0) {
         setIsLoading(false);
@@ -147,8 +163,19 @@ export default function Login() {
           name: result.data.googleLogin.user.name || result.data.googleLogin.user.email,
           picture: result.data.googleLogin.user.picture || "",
           isGoogle: true,
+          isAdmin: result.data.googleLogin.user.isAdmin || false,
         })
       );
+
+      // Use auth context login function
+      login(result.data.googleLogin.token, {
+        id: result.data.googleLogin.user.id,
+        email: result.data.googleLogin.user.email,
+        name: result.data.googleLogin.user.name || result.data.googleLogin.user.email,
+        picture: result.data.googleLogin.user.picture || "",
+        isGoogle: true,
+        isAdmin: result.data.googleLogin.user.isAdmin || false,
+      });
 
       setTimeout(() => {
         router.push("/dashboard");
