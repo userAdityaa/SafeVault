@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signupSchema } from "@/schema/auth";
 import { toast, Toaster } from "sonner";
+import { GRAPHQL_ENDPOINT } from "@/lib/backend";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SignUp() {
   const [form, setForm] = useState({ email: "", password: "", confirmPassword: "" });
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string }>({});
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -44,13 +47,14 @@ export default function SignUp() {
           user {
             id
             email
+            isAdmin
           }
         }
       }
     `;
 
     try {
-      const response = await fetch("http://localhost:8080/query", {
+      const response = await fetch(GRAPHQL_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -79,19 +83,34 @@ export default function SignUp() {
 
       // Store user and token in localStorage
       localStorage.setItem("token", result.data.signup.token);
-      localStorage.setItem("user", JSON.stringify(result.data.signup.user));
+      localStorage.setItem("user", JSON.stringify({
+        ...result.data.signup.user,
+        name: result.data.signup.user.email, // Use email as name for signup
+        picture: "",
+        isGoogle: false,
+        isAdmin: result.data.signup.user.isAdmin || false
+      }));
+
+      // Use auth context login function
+      login(result.data.signup.token, {
+        ...result.data.signup.user,
+        name: result.data.signup.user.email,
+        picture: "",
+        isGoogle: false,
+        isAdmin: result.data.signup.user.isAdmin || false
+      });
 
       // Clear form fields
       setForm({ email: "", password: "", confirmPassword: "" });
 
       // Show success toast
       toast.success("Account created successfully!", {
-        description: "Redirecting to login...",
+        description: "Redirecting to dashboard...",
       });
 
-      // Redirect to login page after a short delay to allow toast to be seen
+      // Redirect to dashboard after a short delay to allow toast to be seen
       setTimeout(() => {
-        router.push("/login");
+        router.push("/dashboard");
       }, 2000);
     } catch (err) {
       toast.error("An error occurred while signing up. Please try again.", {
