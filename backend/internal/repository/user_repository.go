@@ -14,6 +14,10 @@ type UserRepository interface {
 	CreateGoogleUser(ctx context.Context, user *models.GoogleUser) error
 	UpdateGoogleUserProfile(ctx context.Context, email, name, picture string) error
 	FindByID(ctx context.Context, id string) (*models.User, error)
+
+	// New methods for sharing
+	FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error) // returns user, userType, error
+	GetUserEmailByID(ctx context.Context, userID string) (string, error)
 }
 
 type userRepository struct {
@@ -89,4 +93,37 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*models.User,
 func (r *userRepository) UpdateGoogleUserProfile(ctx context.Context, email, name, picture string) error {
 	_, err := r.DB.Exec(ctx, `UPDATE google_users SET name=$2, picture=$3 WHERE email=$1`, email, name, picture)
 	return err
+}
+
+// FindUserByEmailAny looks for a user by email in both users and google_users tables
+func (r *userRepository) FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error) {
+	// Try regular users first
+	user, err := r.FindByEmail(ctx, email)
+	if err == nil {
+		return user, "user", nil
+	}
+
+	// Try Google users
+	googleUser, err := r.FindByGoogleMail(ctx, email)
+	if err == nil {
+		return googleUser, "google_user", nil
+	}
+
+	return nil, "", err
+}
+
+// GetUserEmailByID gets email for any user ID from both tables
+func (r *userRepository) GetUserEmailByID(ctx context.Context, userID string) (string, error) {
+	// Try regular users first
+	query := `SELECT email FROM users WHERE id = $1`
+	var email string
+	err := r.DB.QueryRow(ctx, query, userID).Scan(&email)
+	if err == nil {
+		return email, nil
+	}
+
+	// Try Google users
+	query = `SELECT email FROM google_users WHERE id = $1`
+	err = r.DB.QueryRow(ctx, query, userID).Scan(&email)
+	return email, err
 }
