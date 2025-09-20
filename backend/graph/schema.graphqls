@@ -58,6 +58,12 @@ type Mutation {
   renameFolder(folderId: ID!, newName: String!): Boolean!
   deleteFolder(folderId: ID!): Boolean!
   moveUserFile(mappingId: ID!, folderId: ID): Boolean!
+
+  # Sharing mutations
+  shareFile(input: ShareFileInput!): FileShare!
+  shareFolder(input: ShareFolderInput!): FolderShare!
+  unshareFile(fileId: ID!, sharedWithEmail: String!): Boolean!
+  unshareFolder(folderId: ID!, sharedWithEmail: String!): Boolean!
 }
 
 type User {
@@ -92,6 +98,12 @@ type Query {
     pagination: PageInput
   ): UserFileConnection!
   myFolders(parentId: ID): [Folder!]!
+
+  # Sharing queries
+  sharedFilesWithMe: [SharedFileWithMe!]!
+  sharedFoldersWithMe: [SharedFolderWithMe!]!
+  fileShares(fileId: ID!): [FileShare!]!
+  folderShares(folderId: ID!): [FolderShare!]!
 }
 
 type StorageUsage {
@@ -139,4 +151,69 @@ type Folder {
   name: String!
   parentId: ID
   createdAt: String!
+}
+
+# Sharing types
+type FileShare {
+  id: ID!
+  fileId: ID!
+  ownerId: ID!
+  sharedWithEmail: String!
+  sharedWithId: ID
+  permission: String!
+  sharedAt: String!
+  expiresAt: String
+  file: File!
+  owner: User!
+  sharedWithUser: User
+}
+
+type FolderShare {
+  id: ID!
+  folderId: ID!
+  ownerId: ID!
+  sharedWithEmail: String!
+  sharedWithId: ID
+  permission: String!
+  sharedAt: String!
+  expiresAt: String
+  folder: Folder!
+  owner: User!
+  sharedWithUser: User
+}
+
+type SharedFileWithMe {
+  id: ID!
+  fileId: ID!
+  ownerId: ID!
+  sharedWithEmail: String!
+  permission: String!
+  sharedAt: String!
+  file: File!
+  owner: User!
+}
+
+type SharedFolderWithMe {
+  id: ID!
+  folderId: ID!
+  ownerId: ID!
+  sharedWithEmail: String!
+  permission: String!
+  sharedAt: String!
+  folder: Folder!
+  owner: User!
+}
+
+input ShareFileInput {
+  fileId: ID!
+  emails: [String!]!
+  permission: String! # viewer only
+  expiresAt: String
+}
+
+input ShareFolderInput {
+  folderId: ID!
+  emails: [String!]!
+  permission: String! # viewer only
+  expiresAt: String
 }

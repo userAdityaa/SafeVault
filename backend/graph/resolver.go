@@ -7,4 +7,5 @@ type Resolver struct {
 	GoogleService *services.GoogleService
 	FileService   *services.FileService
 	FolderService *services.FolderService
+	ShareService  *services.ShareService
 }
