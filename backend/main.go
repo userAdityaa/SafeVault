@@ -46,6 +46,7 @@ func main() {
 	folderRepo := repository.NewFolderRepository(db)
 	shareRepo := repository.NewShareRepository(db)
 	publicLinkRepo := repository.NewPublicLinkRepository(db)
+	fileDownloadRepo := repository.NewFileDownloadRepository(db)
 
 	folderService := services.NewFolderService(folderRepo)
 
@@ -94,17 +95,19 @@ func main() {
 	shareService := services.NewShareService(shareRepo, userRepo, fileRepo, folderRepo)
 	publicLinkService := services.NewPublicLinkService(publicLinkRepo, shareRepo, userRepo, fileRepo, folderRepo)
 	adminService := services.NewAdminService(userRepo, fileRepo, folderRepo)
+	fileDownloadService := services.NewFileDownloadService(fileDownloadRepo, fileRepo, shareRepo)
 
 	// Create GraphQL server
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			AuthService:       &authService,
-			GoogleService:     &googleService,
-			FileService:       fileService,
-			FolderService:     folderService,
-			ShareService:      shareService,
-			PublicLinkService: publicLinkService,
-			AdminService:      adminService,
+			AuthService:         &authService,
+			GoogleService:       &googleService,
+			FileService:         fileService,
+			FolderService:       folderService,
+			ShareService:        shareService,
+			PublicLinkService:   publicLinkService,
+			AdminService:        adminService,
+			FileDownloadService: fileDownloadService,
 		},
 	}))
 
