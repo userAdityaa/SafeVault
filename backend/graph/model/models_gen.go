@@ -33,11 +33,39 @@ type FileSearchFilter struct {
 	UploaderName  *string  `json:"uploaderName,omitempty"`
 }
 
+type FileShare struct {
+	ID              string  `json:"id"`
+	FileID          string  `json:"fileId"`
+	OwnerID         string  `json:"ownerId"`
+	SharedWithEmail string  `json:"sharedWithEmail"`
+	SharedWithID    *string `json:"sharedWithId,omitempty"`
+	Permission      string  `json:"permission"`
+	SharedAt        string  `json:"sharedAt"`
+	ExpiresAt       *string `json:"expiresAt,omitempty"`
+	File            *File   `json:"file"`
+	Owner           *User   `json:"owner"`
+	SharedWithUser  *User   `json:"sharedWithUser,omitempty"`
+}
+
 type Folder struct {
 	ID        string  `json:"id"`
 	Name      string  `json:"name"`
 	ParentID  *string `json:"parentId,omitempty"`
 	CreatedAt string  `json:"createdAt"`
+}
+
+type FolderShare struct {
+	ID              string  `json:"id"`
+	FolderID        string  `json:"folderId"`
+	OwnerID         string  `json:"ownerId"`
+	SharedWithEmail string  `json:"sharedWithEmail"`
+	SharedWithID    *string `json:"sharedWithId,omitempty"`
+	Permission      string  `json:"permission"`
+	SharedAt        string  `json:"sharedAt"`
+	ExpiresAt       *string `json:"expiresAt,omitempty"`
+	Folder          *Folder `json:"folder"`
+	Owner           *User   `json:"owner"`
+	SharedWithUser  *User   `json:"sharedWithUser,omitempty"`
 }
 
 type GoogleLoginInput struct {
@@ -63,6 +91,42 @@ type PageInput struct {
 }
 
 type Query struct {
+}
+
+type ShareFileInput struct {
+	FileID     string   `json:"fileId"`
+	Emails     []string `json:"emails"`
+	Permission string   `json:"permission"`
+	ExpiresAt  *string  `json:"expiresAt,omitempty"`
+}
+
+type ShareFolderInput struct {
+	FolderID   string   `json:"folderId"`
+	Emails     []string `json:"emails"`
+	Permission string   `json:"permission"`
+	ExpiresAt  *string  `json:"expiresAt,omitempty"`
+}
+
+type SharedFileWithMe struct {
+	ID              string `json:"id"`
+	FileID          string `json:"fileId"`
+	OwnerID         string `json:"ownerId"`
+	SharedWithEmail string `json:"sharedWithEmail"`
+	Permission      string `json:"permission"`
+	SharedAt        string `json:"sharedAt"`
+	File            *File  `json:"file"`
+	Owner           *User  `json:"owner"`
+}
+
+type SharedFolderWithMe struct {
+	ID              string  `json:"id"`
+	FolderID        string  `json:"folderId"`
+	OwnerID         string  `json:"ownerId"`
+	SharedWithEmail string  `json:"sharedWithEmail"`
+	Permission      string  `json:"permission"`
+	SharedAt        string  `json:"sharedAt"`
+	Folder          *Folder `json:"folder"`
+	Owner           *User   `json:"owner"`
 }
 
 type SignupInput struct {

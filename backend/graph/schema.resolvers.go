@@ -299,6 +299,150 @@ func (r *mutationResolver) MoveUserFile(ctx context.Context, mappingID string, f
 	return true, nil
 }
 
+// ShareFile is the resolver for the shareFile field.
+func (r *mutationResolver) ShareFile(ctx context.Context, input model.ShareFileInput) (*model.FileShare, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	fileID, err := uuid.Parse(input.FileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file ID")
+	}
+
+	var expiresAt *time.Time
+	if input.ExpiresAt != nil {
+		parsedTime, err := time.Parse(time.RFC3339, *input.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expires_at format")
+		}
+		expiresAt = &parsedTime
+	}
+
+	shares, err := r.ShareService.ShareFile(ctx, userID, fileID, input.Emails, input.Permission, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(shares) == 0 {
+		return nil, fmt.Errorf("failed to create share")
+	}
+
+	// Return the first share created
+	share := shares[0]
+	return &model.FileShare{
+		ID:              share.ID.String(),
+		FileID:          share.FileID.String(),
+		OwnerID:         share.OwnerID.String(),
+		SharedWithEmail: share.SharedWithEmail,
+		Permission:      share.Permission,
+		SharedAt:        share.SharedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// ShareFolder is the resolver for the shareFolder field.
+func (r *mutationResolver) ShareFolder(ctx context.Context, input model.ShareFolderInput) (*model.FolderShare, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	folderID, err := uuid.Parse(input.FolderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid folder ID")
+	}
+
+	var expiresAt *time.Time
+	if input.ExpiresAt != nil {
+		t, err := time.Parse(time.RFC3339, *input.ExpiresAt)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expiration date")
+		}
+		expiresAt = &t
+	}
+
+	shares, err := r.ShareService.ShareFolder(ctx, userID, folderID, input.Emails, input.Permission, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(shares) == 0 {
+		return nil, fmt.Errorf("no shares created")
+	}
+
+	// Return the first share (representing the successful operation)
+	share := shares[0]
+	return &model.FolderShare{
+		ID:              share.ID.String(),
+		FolderID:        share.FolderID.String(),
+		OwnerID:         share.OwnerID.String(),
+		SharedWithEmail: share.SharedWithEmail,
+		Permission:      share.Permission,
+		SharedAt:        share.SharedAt.Format(time.RFC3339),
+	}, nil
+}
+
+// UnshareFile is the resolver for the unshareFile field.
+func (r *mutationResolver) UnshareFile(ctx context.Context, fileID string, sharedWithEmail string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file ID")
+	}
+
+	err = r.ShareService.UnshareFile(ctx, userID, fileUUID, sharedWithEmail)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// UnshareFolder is the resolver for the unshareFolder field.
+func (r *mutationResolver) UnshareFolder(ctx context.Context, folderID string, sharedWithEmail string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user ID")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder ID")
+	}
+
+	err = r.ShareService.UnshareFolder(ctx, userID, folderUUID, sharedWithEmail)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // Health is the resolver for the _health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
 	return "ok", nil
@@ -586,7 +730,30 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 	if r.FileService == nil {
 		return "", fmt.Errorf("file service not configured")
 	}
-	return r.FileService.GetFileURL(ctx, userID, fid, in)
+
+	// First try to get the file URL if user owns it
+	url, err := r.FileService.GetFileURL(ctx, userID, fid, in)
+	if err == nil {
+		return url, nil
+	}
+
+	// If user doesn't own the file, check if it's shared with them
+	userEmail, err := r.ShareService.UserRepo.GetUserEmailByID(ctx, userIDStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user email: %w", err)
+	}
+
+	// Check if user has access to this file via sharing
+	hasAccess, _, err := r.ShareService.ShareRepo.HasFileAccess(ctx, userID, userEmail, fid)
+	if err != nil {
+		return "", fmt.Errorf("failed to check file access: %w", err)
+	}
+	if !hasAccess {
+		return "", fmt.Errorf("unauthorized to access this file")
+	}
+
+	// User has access via sharing, generate URL directly
+	return r.FileService.GetSharedFileURL(ctx, fid, in)
 }
 
 // SearchMyFiles is the resolver for the searchMyFiles field.
@@ -731,6 +898,180 @@ func (r *queryResolver) MyFolders(ctx context.Context, parentID *string) ([]*mod
 		out = append(out, &model.Folder{ID: f.ID.String(), Name: f.Name, ParentID: pStr, CreatedAt: f.CreatedAt.Format(time.RFC3339)})
 	}
 	return out, nil
+}
+
+// SharedFilesWithMe is the resolver for the sharedFilesWithMe field.
+func (r *queryResolver) SharedFilesWithMe(ctx context.Context) ([]*model.SharedFileWithMe, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	shares, err := r.ShareService.GetSharedFilesWithMe(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.SharedFileWithMe
+	for _, share := range shares {
+		result = append(result, &model.SharedFileWithMe{
+			ID:              share.ID.String(),
+			FileID:          share.FileID.String(),
+			OwnerID:         share.OwnerID.String(),
+			SharedWithEmail: share.SharedWithEmail,
+			Permission:      share.Permission,
+			SharedAt:        share.SharedAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           share.File.ID.String(),
+				Hash:         share.File.Hash,
+				OriginalName: share.File.OriginalName,
+				MimeType:     share.File.MimeType,
+				Size:         int(share.File.Size),
+				RefCount:     int(share.File.RefCount),
+				Visibility:   share.File.Visibility,
+				CreatedAt:    share.File.CreatedAt.Format(time.RFC3339),
+			},
+			Owner: &model.User{
+				ID:        share.Owner.ID.String(),
+				Email:     share.Owner.Email,
+				CreatedAt: share.Owner.CreatedAt.Format(time.RFC3339),
+				UpdatedAt: share.Owner.CreatedAt.Format(time.RFC3339),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// SharedFoldersWithMe is the resolver for the sharedFoldersWithMe field.
+func (r *queryResolver) SharedFoldersWithMe(ctx context.Context) ([]*model.SharedFolderWithMe, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	shares, err := r.ShareService.GetSharedFoldersWithMe(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.SharedFolderWithMe
+	for _, share := range shares {
+		// Handle nullable ParentID
+		var parentIDStr *string
+		if share.Folder.ParentID != nil {
+			str := share.Folder.ParentID.String()
+			parentIDStr = &str
+		}
+
+		result = append(result, &model.SharedFolderWithMe{
+			ID:              share.ID.String(),
+			FolderID:        share.FolderID.String(),
+			OwnerID:         share.OwnerID.String(),
+			SharedWithEmail: share.SharedWithEmail,
+			Permission:      share.Permission,
+			SharedAt:        share.SharedAt.Format(time.RFC3339),
+			Folder: &model.Folder{
+				ID:        share.Folder.ID.String(),
+				Name:      share.Folder.Name,
+				ParentID:  parentIDStr,
+				CreatedAt: share.Folder.CreatedAt.Format(time.RFC3339),
+			},
+			Owner: &model.User{
+				ID:        share.Owner.ID.String(),
+				Email:     share.Owner.Email,
+				CreatedAt: share.Owner.CreatedAt.Format(time.RFC3339),
+				UpdatedAt: share.Owner.CreatedAt.Format(time.RFC3339),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// FileShares is the resolver for the fileShares field.
+func (r *queryResolver) FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file ID")
+	}
+
+	shares, err := r.ShareService.GetFileShares(ctx, userID, fileUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.FileShare
+	for _, share := range shares {
+
+		result = append(result, &model.FileShare{
+			ID:              share.ID.String(),
+			FileID:          share.FileID.String(),
+			OwnerID:         share.OwnerID.String(),
+			SharedWithEmail: share.SharedWithEmail,
+			Permission:      share.Permission,
+			SharedAt:        share.SharedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
+}
+
+// FolderShares is the resolver for the folderShares field.
+func (r *queryResolver) FolderShares(ctx context.Context, folderID string) ([]*model.FolderShare, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid folder ID")
+	}
+
+	shares, err := r.ShareService.GetFolderShares(ctx, userID, folderUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.FolderShare
+	for _, share := range shares {
+		result = append(result, &model.FolderShare{
+			ID:              share.ID.String(),
+			FolderID:        share.FolderID.String(),
+			OwnerID:         share.OwnerID.String(),
+			SharedWithEmail: share.SharedWithEmail,
+			Permission:      share.Permission,
+			SharedAt:        share.SharedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
 }
 
 // Mutation returns MutationResolver implementation.
