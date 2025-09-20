@@ -25,6 +25,9 @@ type ShareRepository interface {
 	// Check permissions
 	HasFileAccess(ctx context.Context, userID uuid.UUID, userEmail string, fileID uuid.UUID) (bool, string, error)
 	HasFolderAccess(ctx context.Context, userID uuid.UUID, userEmail string, folderID uuid.UUID) (bool, string, error)
+
+	// Get folder contents
+	GetFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error)
 }
 
 type shareRepository struct {
@@ -328,4 +331,55 @@ func (r *shareRepository) HasFolderAccess(ctx context.Context, userID uuid.UUID,
 	}
 
 	return false, "", nil
+}
+
+func (r *shareRepository) GetFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error) {
+	// Get files in the folder by joining with the folder's owner
+	query := `
+		SELECT 
+			uf.id, uf.user_id, uf.file_id, uf.uploaded_at,
+			f.id, f.hash, f.original_name, f.mime_type, f.size, f.ref_count, f.visibility, f.created_at,
+			COALESCE(u.email, gu.email) as uploader_email,
+			COALESCE('', gu.name) as uploader_name,
+			COALESCE('', gu.picture) as uploader_picture
+		FROM user_files uf 
+		JOIN files f ON uf.file_id = f.id 
+		JOIN folders fo ON uf.folder_id = fo.id
+		LEFT JOIN users u ON uf.user_id = u.id 
+		LEFT JOIN google_users gu ON uf.user_id = gu.id 
+		WHERE uf.folder_id = $1 
+		  AND uf.deleted_at IS NULL
+		  AND uf.user_id = fo.user_id
+		ORDER BY uf.uploaded_at DESC`
+
+	rows, err := r.DB.Query(ctx, query, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []models.UserFile
+	for rows.Next() {
+		var uf models.UserFile
+		var uploaderEmail, uploaderName, uploaderPicture string
+
+		err := rows.Scan(
+			&uf.ID, &uf.UserID, &uf.FileID, &uf.UploadedAt,
+			&uf.File.ID, &uf.File.Hash, &uf.File.OriginalName, &uf.File.MimeType,
+			&uf.File.Size, &uf.File.RefCount, &uf.File.Visibility, &uf.File.CreatedAt,
+			&uploaderEmail, &uploaderName, &uploaderPicture,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Set uploader fields
+		uf.UploaderEmail = uploaderEmail
+		uf.UploaderName = uploaderName
+		uf.UploaderPicture = uploaderPicture
+
+		files = append(files, uf)
+	}
+
+	return files, rows.Err()
 }

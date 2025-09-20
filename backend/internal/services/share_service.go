@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -211,4 +212,44 @@ func (s *ShareService) GetSharedFoldersWithMe(ctx context.Context, userID uuid.U
 	}
 
 	return s.ShareRepo.GetFolderSharesForUser(ctx, userEmail)
+}
+
+// HasFolderAccess checks if a user has access to a folder (either as owner or via sharing)
+func (s *ShareService) HasFolderAccess(ctx context.Context, userID uuid.UUID, userEmail string, folderID uuid.UUID) (bool, string, error) {
+	return s.ShareRepo.HasFolderAccess(ctx, userID, userEmail, folderID)
+}
+
+// GetSharedFolderFiles gets files within a shared folder that the user has access to
+func (s *ShareService) GetSharedFolderFiles(ctx context.Context, userID uuid.UUID, folderID uuid.UUID) ([]models.UserFile, error) {
+	// Get user email for access check
+	userEmail, err := s.UserRepo.GetUserEmailByID(ctx, userID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user email: %w", err)
+	}
+
+	log.Printf("DEBUG: User %s (%s) trying to access folder %s", userEmail, userID, folderID)
+
+	// Check if user has access to the folder
+	hasAccess, role, err := s.HasFolderAccess(ctx, userID, userEmail, folderID)
+	if err != nil {
+		log.Printf("DEBUG: Access check error: %v", err)
+		return nil, fmt.Errorf("failed to check folder access: %w", err)
+	}
+	if !hasAccess {
+		log.Printf("DEBUG: User %s does not have access to folder %s", userEmail, folderID)
+		return nil, fmt.Errorf("access denied to folder")
+	}
+
+	log.Printf("DEBUG: User %s has %s access to folder %s", userEmail, role, folderID)
+
+	// Get files in the folder
+	files, err := s.ShareRepo.GetFolderFiles(ctx, folderID)
+	if err != nil {
+		log.Printf("DEBUG: Error getting folder files: %v", err)
+		return nil, fmt.Errorf("failed to get folder files: %w", err)
+	}
+
+	log.Printf("DEBUG: Found %d files in folder %s", len(files), folderID)
+
+	return files, nil
 }
