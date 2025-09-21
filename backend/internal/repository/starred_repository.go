@@ -9,32 +9,42 @@ import (
 	"github.com/useradityaa/internal/models"
 )
 
+// StarredRepository defines the interface for starred items database operations.
+// It provides methods for users to star/unstar files and folders for quick access.
 type StarredRepository interface {
-	// Star/Unstar operations
+	// StarItem adds an item (file or folder) to the user's starred list
 	StarItem(ctx context.Context, userID uuid.UUID, itemType string, itemID uuid.UUID) error
+	// UnstarItem removes an item from the user's starred list
 	UnstarItem(ctx context.Context, userID uuid.UUID, itemType string, itemID uuid.UUID) error
+	// IsItemStarred checks if a specific item is starred by the user
 	IsItemStarred(ctx context.Context, userID uuid.UUID, itemType string, itemID uuid.UUID) (bool, error)
 
-	// List starred items
+	// GetStarredFiles retrieves all starred files for a user with file details
 	GetStarredFiles(ctx context.Context, userID uuid.UUID) ([]models.StarredFile, error)
+	// GetStarredFolders retrieves all starred folders for a user with folder details
 	GetStarredFolders(ctx context.Context, userID uuid.UUID) ([]models.StarredFolder, error)
+	// GetAllStarredItems retrieves all starred items (files and folders) for a user
 	GetAllStarredItems(ctx context.Context, userID uuid.UUID) ([]models.StarredItem, error)
 
-	// Bulk operations
+	// GetStarredStatus returns the starred status for multiple items in a single query
 	GetStarredStatus(ctx context.Context, userID uuid.UUID, items []struct {
 		Type string
 		ID   uuid.UUID
 	}) (map[string]bool, error)
 }
 
+// starredRepository implements StarredRepository using PostgreSQL
 type starredRepository struct {
 	DB *pgxpool.Pool
 }
 
+// NewStarredRepository creates a new starred repository instance
 func NewStarredRepository(db *pgxpool.Pool) StarredRepository {
 	return &starredRepository{DB: db}
 }
 
+// StarItem adds an item (file or folder) to the user's starred list.
+// Uses ON CONFLICT to prevent duplicate stars for the same item.
 func (r *starredRepository) StarItem(ctx context.Context, userID uuid.UUID, itemType string, itemID uuid.UUID) error {
 	query := `
 		INSERT INTO starred_items (user_id, item_type, item_id) 
@@ -45,6 +55,7 @@ func (r *starredRepository) StarItem(ctx context.Context, userID uuid.UUID, item
 	return err
 }
 
+// UnstarItem removes an item from the user's starred list.
 func (r *starredRepository) UnstarItem(ctx context.Context, userID uuid.UUID, itemType string, itemID uuid.UUID) error {
 	query := `
 		DELETE FROM starred_items 

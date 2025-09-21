@@ -10,10 +10,25 @@ import (
 	"github.com/useradityaa/internal/repository"
 )
 
+// GoogleService handles Google OAuth authentication and user management.
+// It processes Google ID tokens, manages Google user accounts, and generates JWT tokens.
 type GoogleService struct {
+	// UserRepo provides database operations for user management
 	UserRepo repository.UserRepository
 }
 
+// LoginWithGoogle authenticates a user using a Google OAuth ID token.
+// It validates the token with Google, creates or updates the user account,
+// and generates a JWT token for the application.
+//
+// Parameters:
+//   - ctx: Request context for database operations
+//   - idToken: Google OAuth ID token to validate
+//
+// Returns:
+//   - *models.GoogleUser: The authenticated Google user object
+//   - string: JWT token for application authentication
+//   - error: nil on success, or an error if authentication fails
 func (s *GoogleService) LoginWithGoogle(ctx context.Context, idToken string) (*models.GoogleUser, string, error) {
 	payload, err := auth.VerifyWithGoogleIDToken(idToken)
 	if err != nil {

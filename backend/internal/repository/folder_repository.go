@@ -10,21 +10,35 @@ import (
 	"github.com/useradityaa/internal/models"
 )
 
+// FolderRepository defines the interface for folder-related database operations.
+// It provides methods for creating, managing, and organizing folders in a hierarchical structure.
 type FolderRepository interface {
+	// CreateFolder creates a new folder for a user, optionally nested under a parent folder
 	CreateFolder(ctx context.Context, userID uuid.UUID, name string, parentID *uuid.UUID) (*models.Folder, error)
+	// RenameFolder changes the name of an existing folder
 	RenameFolder(ctx context.Context, userID, folderID uuid.UUID, newName string) error
+	// DeleteFolder removes a folder from the database
 	DeleteFolder(ctx context.Context, userID, folderID uuid.UUID) error
+	// ListFolders retrieves all folders for a user, optionally filtered by parent folder
 	ListFolders(ctx context.Context, userID uuid.UUID, parentID *uuid.UUID) ([]models.Folder, error)
+	// GetFolderByID retrieves a specific folder by its ID
 	GetFolderByID(ctx context.Context, userID, folderID uuid.UUID) (*models.Folder, error)
+	// CountChildren returns the number of subfolders within a given folder
 	CountChildren(ctx context.Context, userID, folderID uuid.UUID) (int, error)
+	// ValidateParent checks if a folder exists and belongs to the specified user
 	ValidateParent(ctx context.Context, userID uuid.UUID, parentID uuid.UUID) (bool, error)
+	// DeleteFolderReassignFiles removes a folder and reassigns its files to the root level
 	DeleteFolderReassignFiles(ctx context.Context, userID, folderID uuid.UUID) error
 }
 
+// folderRepository implements FolderRepository using PostgreSQL
 type folderRepository struct{ DB *pgxpool.Pool }
 
+// NewFolderRepository creates a new folder repository instance
 func NewFolderRepository(db *pgxpool.Pool) FolderRepository { return &folderRepository{DB: db} }
 
+// CreateFolder creates a new folder for a user, optionally nested under a parent folder.
+// Returns the created folder with its generated ID and timestamp.
 func (r *folderRepository) CreateFolder(ctx context.Context, userID uuid.UUID, name string, parentID *uuid.UUID) (*models.Folder, error) {
 	id := uuid.New()
 	_, err := r.DB.Exec(ctx, `INSERT INTO folders (id, user_id, name, parent_id, created_at) VALUES ($1,$2,$3,$4,$5)`, id, userID, name, parentID, time.Now())
@@ -34,16 +48,22 @@ func (r *folderRepository) CreateFolder(ctx context.Context, userID uuid.UUID, n
 	return &models.Folder{ID: id, UserID: userID, Name: name, ParentID: parentID, CreatedAt: time.Now()}, nil
 }
 
+// RenameFolder changes the name of an existing folder.
+// Only the folder owner can rename their folders.
 func (r *folderRepository) RenameFolder(ctx context.Context, userID, folderID uuid.UUID, newName string) error {
 	_, err := r.DB.Exec(ctx, `UPDATE folders SET name=$3 WHERE id=$1 AND user_id=$2`, folderID, userID, newName)
 	return err
 }
 
+// DeleteFolder removes a folder from the database.
+// Only the folder owner can delete their folders.
 func (r *folderRepository) DeleteFolder(ctx context.Context, userID, folderID uuid.UUID) error {
 	_, err := r.DB.Exec(ctx, `DELETE FROM folders WHERE id=$1 AND user_id=$2`, folderID, userID)
 	return err
 }
 
+// ValidateParent checks if a folder exists and belongs to the specified user.
+// This is used to validate parent folder references when creating nested folders.
 func (r *folderRepository) ValidateParent(ctx context.Context, userID uuid.UUID, parentID uuid.UUID) (bool, error) {
 	row := r.DB.QueryRow(ctx, `SELECT 1 FROM folders WHERE id=$1 AND user_id=$2`, parentID, userID)
 	var one int

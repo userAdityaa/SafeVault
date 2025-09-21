@@ -1,3 +1,5 @@
+// Package services contains the business logic layer for the SnapVault application.
+// Services coordinate between repositories and implement the core application functionality.
 package services
 
 import (
@@ -21,13 +23,30 @@ import (
 	"github.com/useradityaa/internal/repository"
 )
 
+// FileService handles file upload, storage, and retrieval operations.
+// It integrates with MinIO for object storage and PostgreSQL for metadata.
+// The service implements file deduplication using SHA-256 hashes and enforces user quotas.
 type FileService struct {
-	FileRepo       repository.FileRepository
-	Minio          *minio.Client
-	Bucket         string
+	// FileRepo provides database operations for file metadata
+	FileRepo repository.FileRepository
+	// Minio client for object storage operations
+	Minio *minio.Client
+	// Bucket name in MinIO where files are stored
+	Bucket string
+	// PublicEndpoint is the public URL for accessing stored files
 	PublicEndpoint string
 }
 
+// NewFileService creates a new FileService instance with the provided dependencies.
+//
+// Parameters:
+//   - repo: File repository for database operations
+//   - minioClient: MinIO client for object storage
+//   - bucket: Name of the MinIO bucket to use
+//   - publicEndpoint: Public URL endpoint for file access
+//
+// Returns:
+//   - *FileService: Configured file service instance
 func NewFileService(repo repository.FileRepository, minioClient *minio.Client, bucket string, publicEndpoint string) *FileService {
 	return &FileService{
 		FileRepo:       repo,
@@ -37,8 +56,21 @@ func NewFileService(repo repository.FileRepository, minioClient *minio.Client, b
 	}
 }
 
+// perUserQuotaBytes defines the storage quota per user (20 MB)
 const perUserQuotaBytes int64 = 20 * 1024 * 1024 // 20 MB
 
+// UploadFiles handles the upload of multiple files for a user.
+// It enforces user quotas, deduplicates files by hash, and stores them in MinIO.
+// Files are processed sequentially to maintain data consistency.
+//
+// Parameters:
+//   - ctx: Context for cancellation and deadlines
+//   - userID: UUID of the user uploading files
+//   - uploads: Slice of GraphQL Upload objects containing file data
+//
+// Returns:
+//   - []models.UserFile: List of created user-file associations
+//   - error: nil on success, or an error describing what went wrong
 func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads []*graphql.Upload) ([]models.UserFile, error) {
 	if s == nil || s.Minio == nil || s.Bucket == "" {
 		return nil, fmt.Errorf("file storage not configured")

@@ -1,3 +1,6 @@
+// Package repository provides data access layer interfaces and implementations
+// for the SnapVault application. It contains all database operations for users,
+// files, folders, shares, and other entities using PostgreSQL.
 package repository
 
 import (
@@ -7,30 +10,45 @@ import (
 	"github.com/useradityaa/internal/models"
 )
 
+// UserRepository defines the interface for user-related database operations.
+// It handles both manual users (email/password) and Google OAuth users,
+// providing methods for authentication, user management, and admin functionality.
 type UserRepository interface {
+	// FindByEmail retrieves a manual user by their email address
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
+	// FindByGoogleMail retrieves a Google OAuth user by their email address
 	FindByGoogleMail(ctx context.Context, email string) (*models.GoogleUser, error)
+	// Create adds a new manual user to the database
 	Create(ctx context.Context, user *models.User) error
+	// CreateGoogleUser adds a new Google OAuth user to the database
 	CreateGoogleUser(ctx context.Context, user *models.GoogleUser) error
+	// UpdateGoogleUserProfile updates profile information for a Google user
 	UpdateGoogleUserProfile(ctx context.Context, email, name, picture string) error
+	// FindByID retrieves a user by their UUID
 	FindByID(ctx context.Context, id string) (*models.User, error)
 
-	// New methods for sharing
-	FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error) // returns user, userType, error
+	// FindUserByEmailAny searches for a user in both manual and Google user tables
+	// Returns the user object, user type ("manual" or "google"), and any error
+	FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error)
+	// GetUserEmailByID retrieves the email address for a given user ID
 	GetUserEmailByID(ctx context.Context, userID string) (string, error)
 
-	// Admin methods
+	// GetAllUsers retrieves comprehensive user information for admin dashboard
 	GetAllUsers(ctx context.Context) ([]*models.AdminUserInfo, error)
 }
 
+// userRepository implements UserRepository using PostgreSQL
 type userRepository struct {
 	DB *pgxpool.Pool
 }
 
+// NewUserRepository creates a new user repository instance
 func NewUserRepository(db *pgxpool.Pool) UserRepository {
 	return &userRepository{DB: db}
 }
 
+// FindByEmail retrieves a manual user by their email address.
+// This is used for email/password authentication.
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
 	query :=
 		`SELECT id, email, password_hash, created_at
@@ -47,6 +65,8 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models
 	return user, nil
 }
 
+// FindByGoogleMail retrieves a Google OAuth user by their email address.
+// This is used for Google OAuth authentication flow.
 func (r *userRepository) FindByGoogleMail(ctx context.Context, email string) (*models.GoogleUser, error) {
 	query :=
 		`SELECT id, email, COALESCE(name,''), COALESCE(picture,'')
@@ -63,6 +83,8 @@ func (r *userRepository) FindByGoogleMail(ctx context.Context, email string) (*m
 	return user, nil
 }
 
+// Create adds a new manual user to the database.
+// The user's password should already be hashed before calling this method.
 func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	query :=
 		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`
@@ -71,11 +93,15 @@ func (r *userRepository) Create(ctx context.Context, user *models.User) error {
 	return err
 }
 
+// CreateGoogleUser adds a new Google OAuth user to the database.
+// The user ID is auto-generated and returned in the user object.
 func (r *userRepository) CreateGoogleUser(ctx context.Context, user *models.GoogleUser) error {
 	query := `INSERT INTO google_users (email, name, picture) VALUES ($1, $2, $3) RETURNING id`
 	return r.DB.QueryRow(ctx, query, user.Email, user.Name, user.Picture).Scan(&user.ID)
 }
 
+// FindByID retrieves a manual user by their UUID.
+// This is used when we have a user ID from authentication context.
 func (r *userRepository) FindByID(ctx context.Context, id string) (*models.User, error) {
 	query :=
 		`SELECT id, email, password_hash, created_at
@@ -93,12 +119,16 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*models.User,
 	return user, nil
 }
 
+// UpdateGoogleUserProfile updates the name and picture for a Google user.
+// This is typically called when the user's Google profile information changes.
 func (r *userRepository) UpdateGoogleUserProfile(ctx context.Context, email, name, picture string) error {
 	_, err := r.DB.Exec(ctx, `UPDATE google_users SET name=$2, picture=$3 WHERE email=$1`, email, name, picture)
 	return err
 }
 
-// FindUserByEmailAny looks for a user by email in both users and google_users tables
+// FindUserByEmailAny searches for a user by email in both manual and Google user tables.
+// This is useful for sharing features where we need to find any type of user by email.
+// Returns the user object, user type ("user" or "google"), and any error.
 func (r *userRepository) FindUserByEmailAny(ctx context.Context, email string) (interface{}, string, error) {
 	// Try regular users first
 	user, err := r.FindByEmail(ctx, email)

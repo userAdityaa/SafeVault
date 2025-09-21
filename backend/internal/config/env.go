@@ -55,6 +55,15 @@ func Load() *Config {
 	return cfg
 }
 
+// getEnv retrieves an environment variable value with a fallback default.
+// This helper function simplifies environment variable access with default values.
+//
+// Parameters:
+//   - key: The environment variable name to retrieve
+//   - def: The default value to return if the environment variable is not set
+//
+// Returns:
+//   - string: The environment variable value or the default if not found
 func getEnv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -62,6 +71,15 @@ func getEnv(key, def string) string {
 	return def
 }
 
+// getEnvBool retrieves a boolean environment variable with a fallback default.
+// It attempts to parse the environment variable as a boolean value.
+//
+// Parameters:
+//   - key: The environment variable name to retrieve
+//   - def: The default boolean value to return if parsing fails or variable is not set
+//
+// Returns:
+//   - bool: The parsed boolean value or the default if parsing fails
 func getEnvBool(key string, def bool) bool {
 	if v := os.Getenv(key); v != "" {
 		b, err := strconv.ParseBool(v)

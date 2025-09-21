@@ -1,109 +1,190 @@
+# SnapVault GraphQL Schema
+# This schema defines the API for the SnapVault file management system.
+# It provides operations for file upload, storage, sharing, and administration.
+
+"Custom scalar type for file uploads in GraphQL multipart requests"
 scalar Upload
 
+"Authentication response containing JWT token and user information"
 type AuthPayload {
+  "JWT token for subsequent authenticated requests"
   token: String!
+  "User account information"
   user: User!
 }
 
+"Input for creating a new user account"
 input SignupInput {
+  "User's email address (must be unique)"
   email: String!
+  "Plain text password (will be hashed before storage)"
   password: String!
 }
 
+"Input for user authentication"
 input LoginInput {
+  "User's email address"
   email: String!
+  "User's password"
   password: String!
 }
 
+"Represents a file stored in the system with deduplication by hash"
 type File {
+  "Unique identifier for the file"
   id: ID!
+  "SHA-256 hash of file content for deduplication"
   hash: String!
+  "Original filename when uploaded"
   originalName: String!
+  "MIME type describing file content"
   mimeType: String!
+  "File size in bytes"
   size: Int!
+  "Number of users referencing this file"
   refCount: Int!
+  "Access level: private, public, or shared"
   visibility: String!
+  "ISO timestamp when file was created"
   createdAt: String!
 }
 
+"Association between a user and a file they have access to"
 type UserFile {
+  "Unique identifier for this user-file association"
   id: ID!
+  "ID of the user who has access"
   userId: ID!
+  "ID of the file being accessed"
   fileId: ID!
+  "ISO timestamp when association was created"
   uploadedAt: String!
+  "The associated file data"
   file: File!
+  "Information about who originally uploaded the file"
   uploader: Uploader
 }
 
+"Input for uploading one or more files"
 input UploadFileInput {
+  "Array of files to upload"
   files: [Upload!]!
+  "Whether to allow duplicate uploads (bypass deduplication)"
   allowDuplicate: Boolean
 }
 
+"Input for Google OAuth authentication"
 input GoogleLoginInput {
+  "Google ID token from OAuth flow"
   idToken: String!
 }
 
+"Root mutation type containing all write operations"
 type Mutation {
+  # Authentication mutations
+  "Create a new user account"
   signup(input: SignupInput!): AuthPayload!
+  "Authenticate with email and password"
   login(input: LoginInput!): AuthPayload!
+  "Authenticate with Google OAuth"
   googleLogin(input: GoogleLoginInput!): AuthPayload!
 
+  # File mutations
+  "Upload one or more files to user's storage"
   uploadFiles(input: UploadFileInput!): [UserFile!]!
+  "Soft delete a file (moves to trash)"
   deleteFile(fileId: ID!): Boolean!
+  "Recover a soft-deleted file from trash"
   recoverFile(fileId: ID!): Boolean!
+  "Permanently delete a file from storage"
   purgeFile(fileId: ID!): Boolean!
 
   # Folder mutations
+  "Create a new folder for organizing files"
   createFolder(name: String!, parentId: ID): Folder!
+  "Rename an existing folder"
   renameFolder(folderId: ID!, newName: String!): Boolean!
+  "Delete a folder and optionally its contents"
   deleteFolder(folderId: ID!): Boolean!
+  "Move a file to a different folder"
   moveUserFile(mappingId: ID!, folderId: ID): Boolean!
 
   # Sharing mutations
+  "Share a file with another user"
   shareFile(input: ShareFileInput!): FileShare!
+  "Share a folder with another user"
   shareFolder(input: ShareFolderInput!): FolderShare!
+  "Remove file sharing with a specific user"
   unshareFile(fileId: ID!, sharedWithEmail: String!): Boolean!
+  "Remove folder sharing with a specific user"
   unshareFolder(folderId: ID!, sharedWithEmail: String!): Boolean!
 
   # Public link mutations (owner only)
+  "Create a public link for unauthenticated file access"
   createPublicFileLink(fileId: ID!, expiresAt: String): PublicFileLink!
+  "Revoke a public file link"
   revokePublicFileLink(fileId: ID!): Boolean!
+  "Create a public link for unauthenticated folder access"
   createPublicFolderLink(folderId: ID!, expiresAt: String): PublicFolderLink!
+  "Revoke a public folder link"
   revokePublicFolderLink(folderId: ID!): Boolean!
 
   # Add a publicly linked file into my storage (creates user_file mapping)
+  "Save a publicly shared file to your own storage"
   addPublicFileToMyStorage(token: String!): Boolean!
 
   # File activity tracking mutations
+  "Track user activity on a file for analytics"
   trackFileActivity(fileId: ID!, activityType: String!): Boolean!
 
   # Starred items mutations
+  "Add a file to favorites"
   starFile(fileId: ID!): Boolean!
+  "Remove a file from favorites"
   unstarFile(fileId: ID!): Boolean!
+  "Add a folder to favorites"
   starFolder(folderId: ID!): Boolean!
+  "Remove a folder from favorites"
   unstarFolder(folderId: ID!): Boolean!
 }
 
+"Represents a user account in the system"
 type User {
+  "Unique identifier for the user"
   id: ID!
+  "User's email address"
   email: String!
+  "User's display name (optional)"
   name: String
+  "URL to user's profile picture (optional)"
   picture: String
+  "ISO timestamp when account was created"
   createdAt: String!
+  "ISO timestamp when account was last updated"
   updatedAt: String!
+  "Whether user has administrative privileges"
   isAdmin: Boolean!
 }
 
+"Extended user information for administrative views"
 type AdminUserInfo {
+  "Unique identifier for the user"
   id: ID!
+  "User's email address"
   email: String!
+  "User's display name (optional)"
   name: String
+  "URL to user's profile picture (optional)"
   picture: String
+  "ISO timestamp when account was created"
   createdAt: String!
+  "ISO timestamp when account was last updated"
   updatedAt: String!
+  "Total number of files owned by user"
   totalFiles: Int!
+  "Total number of folders owned by user"
   totalFolders: Int!
+  "Total storage used by user in bytes"
   storageUsed: Int!
 }
 
@@ -111,42 +192,69 @@ type AdminUserInfo {
 Represents the uploader of a file. Can originate from either users or google_users.
 """
 type Uploader {
+  "Email address of the uploader"
   email: String!
+  "Display name of the uploader (optional)"
   name: String
+  "Profile picture URL of the uploader (optional)"
   picture: String
 }
 
+"Root query type containing all read operations"
 type Query {
-  # Just a placeholder so the schema is valid
+  # System queries
+  "Health check endpoint"
   _health: String!
+
+  # File queries
+  "Get all files owned by the current user"
   myFiles: [UserFile!]!
+  "Get files in a specific folder (or root if no folderId)"
   myFolderFiles(folderId: ID): [UserFile!]!
+  "Get files that have been soft-deleted"
   myDeletedFiles: [UserFile!]!
+  "Get current user's storage usage statistics"
   myStorage: StorageUsage!
+  "Find a file by its content hash"
   findMyFileByHash(hash: String!): UserFile
+  "Get a signed URL for downloading/viewing a file"
   fileURL(fileId: ID!, inline: Boolean): String!
+  "Search through user's files with filters and pagination"
   searchMyFiles(
     filter: FileSearchFilter!
     pagination: PageInput
   ): UserFileConnection!
+  "Get folders owned by current user (optionally within a parent)"
   myFolders(parentId: ID): [Folder!]!
 
   # Sharing queries
+  "Get files that have been shared with the current user"
   sharedFilesWithMe: [SharedFileWithMe!]!
+  "Get folders that have been shared with the current user"
   sharedFoldersWithMe: [SharedFolderWithMe!]!
+  "Get files within a shared folder"
   sharedFolderFiles(folderId: ID!): [UserFile!]!
+  "Get all users a specific file is shared with"
   fileShares(fileId: ID!): [FileShare!]!
+  "Get all users a specific folder is shared with"
   folderShares(folderId: ID!): [FolderShare!]!
 
   # Public link resolution (no auth required)
+  "Resolve a public file link token to get file information"
   resolvePublicFileLink(token: String!): PublicFileLinkResolved
+  "Resolve a public folder link token to get folder information"
   resolvePublicFolderLink(token: String!): PublicFolderLinkResolved
+  "Get files within a publicly shared folder"
   publicFolderFiles(token: String!): [UserFile!]!
 
   # Admin queries (admin only)
+  "Get information about all users (admin only)"
   adminAllUsers: [AdminUserInfo!]!
+  "Get all files owned by a specific user (admin only)"
   adminUserFiles(userId: ID!): [UserFile!]!
+  "Get all folders owned by a specific user (admin only)"
   adminUserFolders(userId: ID!): [Folder!]!
+  "Get download statistics for all files (admin only)"
   adminFileDownloadStats: [FileDownloadStats!]!
 
   # Download tracking queries (owner only)

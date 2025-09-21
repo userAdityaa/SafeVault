@@ -1,3 +1,6 @@
+// Package main provides the entry point for the SnapVault file management system.
+// This is a GraphQL-based backend server that handles file storage, user authentication,
+// sharing capabilities, and administrative functions using PostgreSQL and MinIO.
 package main
 
 import (
@@ -26,6 +29,10 @@ import (
 	"github.com/useradityaa/internal/services"
 )
 
+// main initializes and starts the SnapVault GraphQL server.
+// It sets up the database connection, runs migrations, initializes MinIO storage,
+// creates all necessary services and repositories, and starts the HTTP server
+// with GraphQL endpoint and playground.
 func main() {
 	// Load configuration (loads .env once)
 	cfg := config.Load()
@@ -139,7 +146,16 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
-// runMigrations executes all .sql files in ./migrations in lexicographic order
+// runMigrations executes all .sql files in ./migrations in lexicographic order.
+// It reads all SQL files from the migrations directory, sorts them alphabetically,
+// and executes them in order against the provided database connection.
+// This ensures database schema changes are applied consistently on startup.
+//
+// Parameters:
+//   - db: PostgreSQL connection pool for executing migration scripts
+//
+// Returns:
+//   - error: nil on success, or an error if any migration fails
 func runMigrations(db *pgxpool.Pool) error {
 	dir := "./migrations"
 	entries, err := os.ReadDir(dir)
