@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { GRAPHQL_ENDPOINT } from "@/lib/backend";
 import { getRecentFileActivities, trackFileActivity, getFileURL } from "./api";
+import { MUTATION_UPLOAD_FOLDER } from "./graphql";
 
 /**
  * Represents a recently accessed file with activity tracking information.
@@ -110,6 +111,12 @@ type UploadItem = {
   error?: string;
   /** Whether this item is being removed from the queue */
   removing?: boolean; 
+  /** Type of upload - file or folder */
+  type?: "file" | "folder";
+  /** For folder uploads - number of files contained */
+  fileCount?: number;
+  /** For folder uploads - folder name */
+  folderName?: string;
 };
 
 /**
@@ -197,6 +204,7 @@ const graphqlUpload = (file: File, token?: string, onProgress?: (pct: number) =>
  */
 export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [dupModal, setDupModal] = useState<{ open: boolean; current?: { item: UploadItem; matchName: string; hash: string } } | null>(null);
@@ -380,6 +388,267 @@ export default function Home() {
 
     // Reset the input to allow re-selecting the same files
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  };
+
+  // Handle folder selection from file input
+  const handleFolderSelect = async (files: FileList | null) => {
+    console.log('=== FOLDER UPLOAD DEBUG ===');
+    console.log('Raw files from input:', files);
+    
+    if (!files || files.length === 0) {
+      console.log('No files selected');
+      return;
+    }
+    
+    console.log('Files count:', files.length);
+    
+    // Log all files with their properties
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      console.log(`File ${i}:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        webkitRelativePath: file.webkitRelativePath,
+        lastModified: file.lastModified
+      });
+    }
+    
+    // Convert FileList to array and filter out system files
+    const fileArray = Array.from(files).filter(file => 
+      !file.name.startsWith('.') && // Filter out hidden files like .DS_Store
+      file.name !== 'Thumbs.db' && // Filter out Windows thumbnail cache
+      file.size > 0 // Filter out empty files
+    );
+    
+    console.log('Filtered files count:', fileArray.length);
+    console.log('Filtered files:', fileArray.map(f => ({ name: f.name, path: f.webkitRelativePath })));
+    
+    if (fileArray.length === 0) {
+      toast.error('No valid files found in the selected folder');
+      return;
+    }
+    
+    const folderName = fileArray[0]?.webkitRelativePath?.split('/')[0] || 'Untitled Folder';
+    console.log('Extracted folder name:', folderName);
+    console.log('=== END FOLDER UPLOAD DEBUG ===');
+    
+    await uploadFolder(fileArray, folderName);
+  };
+
+  // Handle directory upload from drag and drop
+  const handleDirectoryUpload = async (items: DataTransferItemList) => {
+    const filePromises: Promise<File[]>[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry();
+        if (entry?.isDirectory) {
+          console.log('Processing directory:', entry.name);
+          filePromises.push(traverseDirectory(entry as FileSystemDirectoryEntry));
+        }
+      }
+    }
+    
+    const allFiles = (await Promise.all(filePromises)).flat()
+      .filter(file => 
+        !file.name.startsWith('.') && // Filter out hidden files like .DS_Store
+        file.name !== 'Thumbs.db' && // Filter out Windows thumbnail cache
+        file.size > 0 // Filter out empty files
+      );
+      
+    console.log('All files from drag and drop:', allFiles.length, allFiles.map(f => ({ name: f.name, path: f.webkitRelativePath })));
+      
+    if (allFiles.length === 0) {
+      toast.error('No valid files found in the dropped folder');
+      return;
+    }
+    
+    // Get folder name from the first file's path or use a default
+    const folderName = allFiles[0]?.webkitRelativePath?.split('/')[0] || 'Untitled Folder';
+    console.log('Extracted folder name:', folderName);
+    await uploadFolder(allFiles, folderName);
+  };
+
+  // Recursively traverse directory entries
+  const traverseDirectory = async (entry: FileSystemDirectoryEntry): Promise<File[]> => {
+    const files: File[] = [];
+    
+    return new Promise((resolve) => {
+      const reader = entry.createReader();
+      
+      const readEntries = () => {
+        reader.readEntries(async (entries) => {
+          if (entries.length === 0) {
+            resolve(files);
+            return;
+          }
+          
+          for (const entry of entries) {
+            if (entry.isFile) {
+              const file = await new Promise<File>((resolve) => {
+                (entry as FileSystemFileEntry).file(resolve);
+              });
+              // Ensure the file has the correct relative path
+              Object.defineProperty(file, 'webkitRelativePath', {
+                value: entry.fullPath.substring(1), // Remove leading slash
+                writable: false
+              });
+              console.log('File from directory traversal:', file.name, 'Path:', file.webkitRelativePath);
+              files.push(file);
+            } else if (entry.isDirectory) {
+              const subFiles = await traverseDirectory(entry as FileSystemDirectoryEntry);
+              files.push(...subFiles);
+            }
+          }
+          
+          readEntries(); // Continue reading if there are more entries
+        });
+      };
+      
+      readEntries();
+    });
+  };
+
+  // Upload folder with GraphQL mutation
+  const uploadFolder = async (files: File[], folderName: string) => {
+    if (!files.length) return;
+
+    console.log('Starting folder upload:', { folderName, fileCount: files.length });
+
+    // Filter out system files first
+    const validFiles = files.filter(file => !file.name.startsWith('.') && file.name !== 'Thumbs.db');
+    
+    console.log(`Processing ${validFiles.length} valid files out of ${files.length} total files`);
+
+    // Create a folder upload item for progress tracking
+    const folderId = Date.now().toString();
+    const folderUploadItem: UploadItem = {
+      id: folderId,
+      file: new File([], folderName), // Dummy file object for display
+      progress: 0,
+      status: "uploading",
+      type: "folder",
+      fileCount: validFiles.length,
+      folderName: folderName
+    };
+
+    // Add folder upload to uploads list
+    setUploads(prev => [...prev, folderUploadItem]);
+    setNewlyAdded(prev => new Set(prev).add(folderId));
+
+    const formData = new FormData();
+    
+    // Prepare file inputs with relative paths
+    const fileInputs = validFiles.map((file, index) => ({
+      relativePath: file.webkitRelativePath || `${folderName}/${file.name}`
+    }));
+
+    console.log('File inputs prepared:', fileInputs);
+    
+    const operations = {
+      query: MUTATION_UPLOAD_FOLDER,
+      variables: {
+        input: {
+          folderName,
+          files: fileInputs,
+          allowDuplicate: false
+        }
+      }
+    };
+    
+    // Create map for multipart upload - this maps form data fields to GraphQL variables
+    const map: Record<string, string[]> = {};
+    validFiles.forEach((_, index) => {
+      map[index.toString()] = [`variables.input.files.${index}.file`];
+    });
+
+    console.log('Upload map:', map);
+    
+    // Build FormData
+    formData.append('operations', JSON.stringify(operations));
+    formData.append('map', JSON.stringify(map));
+    
+    // Append actual files with their index as the key
+    validFiles.forEach((file, index) => {
+      console.log(`Appending file ${index}:`, file.name, 'Path:', file.webkitRelativePath);
+      formData.append(index.toString(), file);
+    });
+    
+    try {
+      // Simulate progress updates
+      setUploads(prev => prev.map(u => u.id === folderId ? { ...u, progress: 25 } : u));
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${GRAPHQL_ENDPOINT}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      
+      setUploads(prev => prev.map(u => u.id === folderId ? { ...u, progress: 75 } : u));
+      
+      const result = await response.json();
+      
+      console.log('Upload response:', result);
+      
+      if (result.errors) {
+        console.error('GraphQL errors:', result.errors);
+        setUploads(prev => prev.map(u => u.id === folderId ? { 
+          ...u, 
+          status: "error", 
+          error: result.errors[0]?.message || 'Upload failed'
+        } : u));
+        setTimeout(() => removeUploadItem(folderId), 3000);
+        throw new Error(result.errors[0]?.message || 'Upload failed');
+      }
+      
+      if (!result.data || !result.data.uploadFolder) {
+        console.error('Invalid response structure:', result);
+        setUploads(prev => prev.map(u => u.id === folderId ? { 
+          ...u, 
+          status: "error", 
+          error: 'Invalid response from server'
+        } : u));
+        setTimeout(() => removeUploadItem(folderId), 3000);
+        throw new Error('Invalid response from server');
+      }
+      
+      const { folder, files: uploadedFiles, summary } = result.data.uploadFolder;
+      
+      console.log('Upload successful:', { folder, uploadedFiles, summary });
+      
+      // Mark upload as complete
+      setUploads(prev => prev.map(u => u.id === folderId ? { 
+        ...u, 
+        progress: 100,
+        status: "done"
+      } : u));
+      
+      toast.success(`Folder "${folder.name}" uploaded successfully! ${summary.totalFiles} files in ${summary.totalFolders} folders.`);
+      
+      // Remove the upload item after a delay
+      setTimeout(() => removeUploadItem(folderId), 2000);
+      
+      // Trigger refresh of file listings
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("files:updated"));
+      }
+      
+    } catch (error) {
+      console.error('Folder upload error:', error);
+      setUploads(prev => prev.map(u => u.id === folderId ? { 
+        ...u, 
+        status: "error", 
+        error: error instanceof Error ? error.message : 'Failed to upload folder'
+      } : u));
+      setTimeout(() => removeUploadItem(folderId), 3000);
+      toast.error(error instanceof Error ? error.message : 'Failed to upload folder');
+    }
   };
 
   return (
@@ -441,8 +710,20 @@ export default function Home() {
             e.preventDefault();
             e.stopPropagation();
             setDragOver(false);
-            const files = e.dataTransfer.files;
-            await startUploads(files);
+            const items = e.dataTransfer.items;
+            if (items) {
+              // Check if any item is a directory
+              const hasDirectories = Array.from(items).some(item => item.webkitGetAsEntry()?.isDirectory);
+              if (hasDirectories) {
+                await handleDirectoryUpload(items);
+              } else {
+                const files = e.dataTransfer.files;
+                await startUploads(files);
+              }
+            } else {
+              const files = e.dataTransfer.files;
+              await startUploads(files);
+            }
           }}
           onDragOver={(e) => {
             e.preventDefault();
@@ -455,13 +736,35 @@ export default function Home() {
             setDragOver(false);
           }}
           className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-5 cursor-pointer transition ${dragOver ? "border-blue-500 text-blue-600 bg-blue-50" : "border-gray-300 hover:border-blue-500 hover:text-blue-600"}`}
-          onClick={() => fileInputRef.current?.click()}
         >
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-blue-600 text-2xl mb-3">+</div>
           <p className="font-medium text-gray-600">Add New or Drag & Drop</p>
-          <p className="text-xs text-gray-500 mt-1">Drop files here to upload</p>
+          <p className="text-xs text-gray-500 mt-1">Drop files or folders here to upload</p>
+          
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Upload Files
+            </button>
+            <button
+              onClick={() => folderInputRef.current?.click()}
+              className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Upload Folder
+            </button>
+          </div>
         </div>
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => startUploads(e.target.files)} />
+        <input 
+          ref={folderInputRef} 
+          type="file" 
+          {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement> & { webkitdirectory: string })} 
+          multiple 
+          className="hidden" 
+          onChange={(e) => handleFolderSelect(e.target.files)} 
+        />
       </section>
 
       {/* Duplicate Modal */}

@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Eye, Download, ExternalLink, ArrowLeft } from "lucide-react";
 import { PreviewModal } from "./my-files/modals";
 import { gqlFetch } from "./api";
-import { QUERY_FILE_URL, QUERY_SHARED_FOLDER_FILES } from "./graphql";
+import { QUERY_FILE_URL, QUERY_SHARED_FOLDER_FILES, QUERY_SHARED_FOLDER_SUBFOLDERS } from "./graphql";
 
 interface SharedContentResponse {
   sharedFilesWithMe: SharedFile[];
@@ -33,6 +33,13 @@ type GqlUserFile = {
     name?: string;
     picture?: string;
   };
+};
+
+type GqlFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
 };
 
 // Moved to a constant here; could be exported if needed elsewhere
@@ -103,6 +110,7 @@ export default function SharedFiles() {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentFolderName, setCurrentFolderName] = useState<string | null>(null);
   const [folderFiles, setFolderFiles] = useState<GqlUserFile[]>([]);
+  const [folderSubfolders, setFolderSubfolders] = useState<GqlFolder[]>([]);
   const [folderLoading, setFolderLoading] = useState(false);
 
   const fetchSharedContent = async () => {
@@ -135,13 +143,18 @@ export default function SharedFiles() {
   const fetchSharedFolderFiles = async (folderId: string) => {
     setFolderLoading(true);
     try {
-      const data = await gqlFetch<{ sharedFolderFiles: GqlUserFile[] }>(QUERY_SHARED_FOLDER_FILES, { folderId });
-      setFolderFiles(data.sharedFolderFiles || []);
+      const [filesData, subfoldersData] = await Promise.all([
+        gqlFetch<{ sharedFolderFiles: GqlUserFile[] }>(QUERY_SHARED_FOLDER_FILES, { folderId }),
+        gqlFetch<{ sharedFolderSubfolders: GqlFolder[] }>(QUERY_SHARED_FOLDER_SUBFOLDERS, { folderId })
+      ]);
+      setFolderFiles(filesData.sharedFolderFiles || []);
+      setFolderSubfolders(subfoldersData.sharedFolderSubfolders || []);
     } catch (e: unknown) {
       const error = e as Error;
-      const msg = error.message || "Failed to fetch folder files";
+      const msg = error.message || "Failed to fetch folder content";
       toast.error(msg);
       setFolderFiles([]);
+      setFolderSubfolders([]);
     } finally {
       setFolderLoading(false);
     }
@@ -157,6 +170,13 @@ export default function SharedFiles() {
     setCurrentFolderId(null);
     setCurrentFolderName(null);
     setFolderFiles([]);
+    setFolderSubfolders([]);
+  };
+
+  const handleOpenSubfolder = async (subfolder: GqlFolder) => {
+    setCurrentFolderId(subfolder.id);
+    setCurrentFolderName(subfolder.name);
+    await fetchSharedFolderFiles(subfolder.id);
   };
 
   const getFileURL = async (fileId: string, inline: boolean): Promise<string> => {
@@ -312,47 +332,83 @@ export default function SharedFiles() {
                 </div>
               ))}
             </div>
-          ) : folderFiles.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {folderFiles.map((file) => (
-                <div key={file.id} className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Image src="/files.svg" alt="file icon" width={32} height={32} className="opacity-80" />
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-800 truncate" title={file.file.originalName}>
-                        {file.file.originalName.length > 25 
-                          ? file.file.originalName.slice(0, 25) + "..." 
-                          : file.file.originalName}
+          ) : (folderSubfolders.length > 0 || folderFiles.length > 0) ? (
+            <div className="space-y-6">
+              {/* Subfolders */}
+              {folderSubfolders.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Folders</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {folderSubfolders.map((subfolder) => (
+                      <div key={subfolder.id} className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition cursor-pointer"
+                           onClick={() => handleOpenSubfolder(subfolder)}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <Image src="/folder.svg" alt="folder icon" width={32} height={32} className="opacity-80" />
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800">{subfolder.name}</div>
+                            <div className="text-xs text-gray-400">
+                              Created {formatDate(subfolder.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                            Folder
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400">
-                        {formatFileSize(file.file.size)} • {file.uploader?.name || file.uploader?.email}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleFolderFilePreview(file)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-sm"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Preview
-                    </button>
-                    <button
-                      onClick={() => handleFolderFileDownload(file)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </button>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Files */}
+              {folderFiles.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Files</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {folderFiles.map((file) => (
+                      <div key={file.id} className="bg-white rounded-2xl shadow-md p-5 hover:shadow-lg transition">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Image src="/files.svg" alt="file icon" width={32} height={32} className="opacity-80" />
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-800 truncate" title={file.file.originalName}>
+                              {file.file.originalName.length > 25 
+                                ? file.file.originalName.slice(0, 25) + "..." 
+                                : file.file.originalName}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {formatFileSize(file.file.size)} • {file.uploader?.name || file.uploader?.email}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleFolderFilePreview(file)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition text-sm"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Preview
+                          </button>
+                          <button
+                            onClick={() => handleFolderFileDownload(file)}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition text-sm"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12">
-              <Image src="/files.svg" alt="files icon" width={64} height={64} className="mx-auto opacity-50 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No files in this folder</h3>
-              <p className="text-gray-500">This shared folder is empty.</p>
+              <Image src="/folder.svg" alt="folder icon" width={64} height={64} className="mx-auto opacity-50 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">This folder is empty</h3>
+              <p className="text-gray-500">This shared folder contains no files or subfolders.</p>
             </div>
           )}
         </div>

@@ -182,7 +182,9 @@ export const NewFolderModal: React.FC<{ open: boolean; name: string; setName: (v
   );
 };
 
-export const DeleteFolderModal: React.FC<{ open: boolean; folder?: GqlFolder | null; onCancel: ()=>void; onConfirm: ()=>void; disabled?: boolean; }> = ({ open, folder, onCancel, onConfirm, disabled }) => {
+export const DeleteFolderModal: React.FC<{ open: boolean; folder?: GqlFolder | null; onCancel: ()=>void; onConfirm: (recursive: boolean)=>void; disabled?: boolean; }> = ({ open, folder, onCancel, onConfirm, disabled }) => {
+  const [recursive, setRecursive] = useState(false);
+  
   if (!open || !folder) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -191,12 +193,37 @@ export const DeleteFolderModal: React.FC<{ open: boolean; folder?: GqlFolder | n
           <h3 className="text-base sm:text-lg font-semibold text-gray-900">Delete folder</h3>
           <button className="text-gray-600 hover:text-gray-900 p-1" onClick={onCancel}>✕</button>
         </div>
-        <div className="text-sm text-gray-700 leading-relaxed">
-          Are you sure you want to delete the folder <span className="font-medium break-words">&quot;{folder.name}&quot;</span>? Files inside will be moved to Root.
+        <div className="text-sm text-gray-700 leading-relaxed mb-4">
+          Are you sure you want to delete the folder <span className="font-medium break-words">&quot;{folder.name}&quot;</span>?
+        </div>
+        <div className="mb-4">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={recursive}
+              onChange={(e) => setRecursive(e.target.checked)}
+              className="mr-2 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">
+              Delete all contents (subfolders and files) recursively
+            </span>
+          </label>
+          <div className="text-xs text-gray-500 mt-1 ml-6">
+            {recursive ? 
+              "All files and subfolders will be permanently deleted." : 
+              "Files inside will be moved to Root folder."
+            }
+          </div>
         </div>
         <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-end">
           <button className="px-3 sm:px-4 py-2 sm:mr-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm order-2 sm:order-1" onClick={onCancel} disabled={disabled}>Cancel</button>
-          <button className="px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50 text-sm order-1 sm:order-2" disabled={disabled} onClick={onConfirm}>Delete</button>
+          <button 
+            className="px-3 sm:px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50 text-sm order-1 sm:order-2" 
+            disabled={disabled} 
+            onClick={() => onConfirm(recursive)}
+          >
+            Delete {recursive ? 'All' : 'Folder'}
+          </button>
         </div>
       </div>
     </div>

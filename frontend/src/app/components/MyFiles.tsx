@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { GqlUserFile, SearchState, GqlFolder } from "./types";
-import { QUERY_SEARCH_MY_FILES, QUERY_MY_FOLDERS, QUERY_MY_FOLDER_FILES, MUTATION_CREATE_FOLDER, MUTATION_RENAME_FOLDER, MUTATION_DELETE_FOLDER, MUTATION_MOVE_USER_FILE, MUTATION_DELETE_FILE, QUERY_MY_STARRED_ITEMS, MUTATION_STAR_FILE, MUTATION_UNSTAR_FILE, MUTATION_STAR_FOLDER, MUTATION_UNSTAR_FOLDER } from "./graphql";
+import { QUERY_SEARCH_MY_FILES, QUERY_MY_FOLDERS, QUERY_MY_FOLDER_FILES, MUTATION_CREATE_FOLDER, MUTATION_RENAME_FOLDER, MUTATION_DELETE_FOLDER, MUTATION_DELETE_FOLDER_RECURSIVE, MUTATION_MOVE_USER_FILE, MUTATION_DELETE_FILE, QUERY_MY_STARRED_ITEMS, MUTATION_STAR_FILE, MUTATION_UNSTAR_FILE, MUTATION_STAR_FOLDER, MUTATION_UNSTAR_FOLDER } from "./graphql";
 import { gqlFetch, getFileURL, trackFileActivity } from "./api";
 import { Breadcrumb } from "./my-files/Breadcrumb";
 import { FolderGrid } from "./my-files/FolderGrid";
@@ -36,7 +36,7 @@ export default function MyFiles() {
   const [starredItems, setStarredItems] = useState<Set<string>>(new Set());
   const [movePicker, setMovePicker] = useState<{ open: boolean; mappingId?: string } | null>(null);
   const [newFolderModal, setNewFolderModal] = useState<{ open: boolean; name: string }>({ open: false, name: "" });
-  const [deleteFolderModal, setDeleteFolderModal] = useState<{ open: boolean; folder?: GqlFolder | null }>({ open: false });
+  const [deleteFolderModal, setDeleteFolderModal] = useState<{ open: boolean; folder?: GqlFolder | null; recursive?: boolean }>({ open: false });
   const [renameFolderModal, setRenameFolderModal] = useState<{ open: boolean; folder?: GqlFolder | null; name: string }>({ open: false, name: "" });
   const [shareModal, setShareModal] = useState<{ open: boolean; itemType?: "file" | "folder"; itemId?: string; itemName?: string }>({ open: false });
 
@@ -156,12 +156,14 @@ export default function MyFiles() {
     }
   };
 
-  const deleteFolder = async (folder: GqlFolder) => {
+  const deleteFolder = async (folder: GqlFolder, recursive: boolean = false) => {
     setFolderCruding(true);
     try {
-      const data = await gqlFetch<{ deleteFolder: boolean }>(MUTATION_DELETE_FOLDER, { folderId: folder.id });
-      if (!data?.deleteFolder) throw new Error("Failed to delete folder");
-      toast.success("Folder deleted");
+      const mutation = recursive ? MUTATION_DELETE_FOLDER_RECURSIVE : MUTATION_DELETE_FOLDER;
+      const data = await gqlFetch<{ deleteFolder?: boolean; deleteFolderRecursive?: boolean }>(mutation, { folderId: folder.id });
+      const success = recursive ? data?.deleteFolderRecursive : data?.deleteFolder;
+      if (!success) throw new Error("Failed to delete folder");
+      toast.success(`Folder ${recursive ? 'and all contents' : ''} deleted`);
       if (currentFolderId === folder.id) {
         setCurrentFolderId(folder.parentId || null);
         setCurrentFolderName(null);
@@ -267,6 +269,8 @@ export default function MyFiles() {
     fetchFolderFiles(null);
     loadStarredItems();
     const onUpdated = () => {
+      // Refresh both folders and files when files are updated
+      fetchFolders(currentFolderId);
       if (isSearchActive()) searchFiles(true); else fetchFolderFiles(currentFolderId);
     };
     window.addEventListener("files:updated", onUpdated);
@@ -416,7 +420,7 @@ export default function MyFiles() {
       <DeleteFolderModal 
         open={deleteFolderModal.open} folder={deleteFolderModal.folder} disabled={folderCruding} 
         onCancel={()=> setDeleteFolderModal({ open:false, folder: null })} 
-        onConfirm={async ()=>{ if(deleteFolderModal.folder) await deleteFolder(deleteFolderModal.folder); setDeleteFolderModal({ open:false, folder:null }); }} />
+        onConfirm={async (recursive: boolean)=>{ if(deleteFolderModal.folder) await deleteFolder(deleteFolderModal.folder, recursive); setDeleteFolderModal({ open:false, folder:null }); }} />
       <RenameFolderModal 
         open={renameFolderModal.open} 
         folder={renameFolderModal.folder} 

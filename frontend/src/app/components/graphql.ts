@@ -22,6 +22,14 @@ export const QUERY_SHARED_FOLDER_FILES = `
   query SharedFolderFiles($folderId: ID!) { sharedFolderFiles(folderId: $folderId) { id userId fileId uploadedAt file { id hash originalName mimeType size refCount visibility createdAt } uploader { email name picture } } }
 `;
 
+export const QUERY_SHARED_FOLDER_SUBFOLDERS = `
+  query SharedFolderSubfolders($folderId: ID!) { sharedFolderSubfolders(folderId: $folderId) { id name parentId createdAt } }
+`;
+
+export const QUERY_PUBLIC_FOLDER_SUBFOLDERS = `
+  query PublicFolderSubfolders($token: String!) { publicFolderSubfolders(token: $token) { id name parentId createdAt } }
+`;
+
 export const MUTATION_CREATE_FOLDER = `
   mutation CreateFolder($name: String!, $parentId: ID) { createFolder(name: $name, parentId: $parentId) { id name parentId createdAt } }
 `;
@@ -32,6 +40,20 @@ export const MUTATION_RENAME_FOLDER = `
 
 export const MUTATION_DELETE_FOLDER = `
   mutation DeleteFolder($folderId: ID!) { deleteFolder(folderId: $folderId) }
+`;
+
+export const MUTATION_DELETE_FOLDER_RECURSIVE = `
+  mutation DeleteFolderRecursive($folderId: ID!) { deleteFolderRecursive(folderId: $folderId) }
+`;
+
+export const MUTATION_UPLOAD_FOLDER = `
+  mutation UploadFolder($input: UploadFolderInput!) {
+    uploadFolder(input: $input) {
+      folder { id name parentId createdAt }
+      files { id userId fileId uploadedAt file { id hash originalName mimeType size refCount visibility createdAt } uploader { email name picture } }
+      summary { totalFiles totalFolders totalSize }
+    }
+  }
 `;
 
 export const MUTATION_MOVE_USER_FILE = `
