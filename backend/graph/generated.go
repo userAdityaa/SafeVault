@@ -164,9 +164,13 @@ type ComplexityRoot struct {
 		ShareFile                func(childComplexity int, input model.ShareFileInput) int
 		ShareFolder              func(childComplexity int, input model.ShareFolderInput) int
 		Signup                   func(childComplexity int, input model.SignupInput) int
+		StarFile                 func(childComplexity int, fileID string) int
+		StarFolder               func(childComplexity int, folderID string) int
 		TrackFileActivity        func(childComplexity int, fileID string, activityType string) int
 		UnshareFile              func(childComplexity int, fileID string, sharedWithEmail string) int
 		UnshareFolder            func(childComplexity int, folderID string, sharedWithEmail string) int
+		UnstarFile               func(childComplexity int, fileID string) int
+		UnstarFolder             func(childComplexity int, folderID string) int
 		UploadFiles              func(childComplexity int, input model.UploadFileInput) int
 	}
 
@@ -226,6 +230,9 @@ type ComplexityRoot struct {
 		MyFolders               func(childComplexity int, parentID *string) int
 		MyRecentFileActivities  func(childComplexity int, limit *int) int
 		MySharedFileDownloads   func(childComplexity int) int
+		MyStarredFiles          func(childComplexity int) int
+		MyStarredFolders        func(childComplexity int) int
+		MyStarredItems          func(childComplexity int) int
 		MyStorage               func(childComplexity int) int
 		PublicFolderFiles       func(childComplexity int, token string) int
 		ResolvePublicFileLink   func(childComplexity int, token string) int
@@ -265,6 +272,32 @@ type ComplexityRoot struct {
 		Permission      func(childComplexity int) int
 		SharedAt        func(childComplexity int) int
 		SharedWithEmail func(childComplexity int) int
+	}
+
+	StarredFile struct {
+		File      func(childComplexity int) int
+		ID        func(childComplexity int) int
+		ItemID    func(childComplexity int) int
+		ItemType  func(childComplexity int) int
+		StarredAt func(childComplexity int) int
+		UserID    func(childComplexity int) int
+	}
+
+	StarredFolder struct {
+		Folder    func(childComplexity int) int
+		ID        func(childComplexity int) int
+		ItemID    func(childComplexity int) int
+		ItemType  func(childComplexity int) int
+		StarredAt func(childComplexity int) int
+		UserID    func(childComplexity int) int
+	}
+
+	StarredItem struct {
+		ID        func(childComplexity int) int
+		ItemID    func(childComplexity int) int
+		ItemType  func(childComplexity int) int
+		StarredAt func(childComplexity int) int
+		UserID    func(childComplexity int) int
 	}
 
 	StorageUsage struct {
@@ -334,6 +367,10 @@ type MutationResolver interface {
 	RevokePublicFolderLink(ctx context.Context, folderID string) (bool, error)
 	AddPublicFileToMyStorage(ctx context.Context, token string) (bool, error)
 	TrackFileActivity(ctx context.Context, fileID string, activityType string) (bool, error)
+	StarFile(ctx context.Context, fileID string) (bool, error)
+	UnstarFile(ctx context.Context, fileID string) (bool, error)
+	StarFolder(ctx context.Context, folderID string) (bool, error)
+	UnstarFolder(ctx context.Context, folderID string) (bool, error)
 }
 type QueryResolver interface {
 	Health(ctx context.Context) (string, error)
@@ -360,6 +397,9 @@ type QueryResolver interface {
 	MyFileDownloads(ctx context.Context, fileID string) ([]*model.FileDownload, error)
 	MySharedFileDownloads(ctx context.Context) ([]*model.FileDownload, error)
 	MyRecentFileActivities(ctx context.Context, limit *int) ([]*model.RecentFileActivity, error)
+	MyStarredFiles(ctx context.Context) ([]*model.StarredFile, error)
+	MyStarredFolders(ctx context.Context) ([]*model.StarredFolder, error)
+	MyStarredItems(ctx context.Context) ([]*model.StarredItem, error)
 }
 
 type executableSchema struct {
@@ -1009,6 +1049,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.Signup(childComplexity, args["input"].(model.SignupInput)), true
+	case "Mutation.starFile":
+		if e.complexity.Mutation.StarFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_starFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.StarFile(childComplexity, args["fileId"].(string)), true
+	case "Mutation.starFolder":
+		if e.complexity.Mutation.StarFolder == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_starFolder_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.StarFolder(childComplexity, args["folderId"].(string)), true
 	case "Mutation.trackFileActivity":
 		if e.complexity.Mutation.TrackFileActivity == nil {
 			break
@@ -1042,6 +1104,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Mutation.UnshareFolder(childComplexity, args["folderId"].(string), args["sharedWithEmail"].(string)), true
+	case "Mutation.unstarFile":
+		if e.complexity.Mutation.UnstarFile == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unstarFile_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnstarFile(childComplexity, args["fileId"].(string)), true
+	case "Mutation.unstarFolder":
+		if e.complexity.Mutation.UnstarFolder == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_unstarFolder_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.UnstarFolder(childComplexity, args["folderId"].(string)), true
 	case "Mutation.uploadFiles":
 		if e.complexity.Mutation.UploadFiles == nil {
 			break
@@ -1349,6 +1433,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.MySharedFileDownloads(childComplexity), true
+	case "Query.myStarredFiles":
+		if e.complexity.Query.MyStarredFiles == nil {
+			break
+		}
+
+		return e.complexity.Query.MyStarredFiles(childComplexity), true
+	case "Query.myStarredFolders":
+		if e.complexity.Query.MyStarredFolders == nil {
+			break
+		}
+
+		return e.complexity.Query.MyStarredFolders(childComplexity), true
+	case "Query.myStarredItems":
+		if e.complexity.Query.MyStarredItems == nil {
+			break
+		}
+
+		return e.complexity.Query.MyStarredItems(childComplexity), true
 	case "Query.myStorage":
 		if e.complexity.Query.MyStorage == nil {
 			break
@@ -1557,6 +1659,111 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.SharedFolderWithMe.SharedWithEmail(childComplexity), true
+
+	case "StarredFile.file":
+		if e.complexity.StarredFile.File == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.File(childComplexity), true
+	case "StarredFile.id":
+		if e.complexity.StarredFile.ID == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.ID(childComplexity), true
+	case "StarredFile.itemId":
+		if e.complexity.StarredFile.ItemID == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.ItemID(childComplexity), true
+	case "StarredFile.itemType":
+		if e.complexity.StarredFile.ItemType == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.ItemType(childComplexity), true
+	case "StarredFile.starredAt":
+		if e.complexity.StarredFile.StarredAt == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.StarredAt(childComplexity), true
+	case "StarredFile.userId":
+		if e.complexity.StarredFile.UserID == nil {
+			break
+		}
+
+		return e.complexity.StarredFile.UserID(childComplexity), true
+
+	case "StarredFolder.folder":
+		if e.complexity.StarredFolder.Folder == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.Folder(childComplexity), true
+	case "StarredFolder.id":
+		if e.complexity.StarredFolder.ID == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.ID(childComplexity), true
+	case "StarredFolder.itemId":
+		if e.complexity.StarredFolder.ItemID == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.ItemID(childComplexity), true
+	case "StarredFolder.itemType":
+		if e.complexity.StarredFolder.ItemType == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.ItemType(childComplexity), true
+	case "StarredFolder.starredAt":
+		if e.complexity.StarredFolder.StarredAt == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.StarredAt(childComplexity), true
+	case "StarredFolder.userId":
+		if e.complexity.StarredFolder.UserID == nil {
+			break
+		}
+
+		return e.complexity.StarredFolder.UserID(childComplexity), true
+
+	case "StarredItem.id":
+		if e.complexity.StarredItem.ID == nil {
+			break
+		}
+
+		return e.complexity.StarredItem.ID(childComplexity), true
+	case "StarredItem.itemId":
+		if e.complexity.StarredItem.ItemID == nil {
+			break
+		}
+
+		return e.complexity.StarredItem.ItemID(childComplexity), true
+	case "StarredItem.itemType":
+		if e.complexity.StarredItem.ItemType == nil {
+			break
+		}
+
+		return e.complexity.StarredItem.ItemType(childComplexity), true
+	case "StarredItem.starredAt":
+		if e.complexity.StarredItem.StarredAt == nil {
+			break
+		}
+
+		return e.complexity.StarredItem.StarredAt(childComplexity), true
+	case "StarredItem.userId":
+		if e.complexity.StarredItem.UserID == nil {
+			break
+		}
+
+		return e.complexity.StarredItem.UserID(childComplexity), true
 
 	case "StorageUsage.percentUsed":
 		if e.complexity.StorageUsage.PercentUsed == nil {
@@ -2064,6 +2271,28 @@ func (ec *executionContext) field_Mutation_signup_args(ctx context.Context, rawA
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_starFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_starFolder_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "folderId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["folderId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_trackFileActivity_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2109,6 +2338,28 @@ func (ec *executionContext) field_Mutation_unshareFolder_args(ctx context.Contex
 		return nil, err
 	}
 	args["sharedWithEmail"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unstarFile_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "fileId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["fileId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_unstarFolder_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "folderId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["folderId"] = arg0
 	return args, nil
 }
 
@@ -5654,6 +5905,170 @@ func (ec *executionContext) fieldContext_Mutation_trackFileActivity(ctx context.
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_starFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_starFile,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().StarFile(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_starFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_starFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unstarFile(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_unstarFile,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UnstarFile(ctx, fc.Args["fileId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unstarFile(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unstarFile_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_starFolder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_starFolder,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().StarFolder(ctx, fc.Args["folderId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_starFolder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_starFolder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_unstarFolder(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_unstarFolder,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Mutation().UnstarFolder(ctx, fc.Args["folderId"].(string))
+		},
+		nil,
+		ec.marshalNBoolean2bool,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_unstarFolder(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_unstarFolder_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -7636,6 +8051,133 @@ func (ec *executionContext) fieldContext_Query_myRecentFileActivities(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_myStarredFiles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myStarredFiles,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MyStarredFiles(ctx)
+		},
+		nil,
+		ec.marshalNStarredFile2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFileᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myStarredFiles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StarredFile_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_StarredFile_userId(ctx, field)
+			case "itemType":
+				return ec.fieldContext_StarredFile_itemType(ctx, field)
+			case "itemId":
+				return ec.fieldContext_StarredFile_itemId(ctx, field)
+			case "starredAt":
+				return ec.fieldContext_StarredFile_starredAt(ctx, field)
+			case "file":
+				return ec.fieldContext_StarredFile_file(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StarredFile", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myStarredFolders(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myStarredFolders,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MyStarredFolders(ctx)
+		},
+		nil,
+		ec.marshalNStarredFolder2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFolderᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myStarredFolders(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StarredFolder_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_StarredFolder_userId(ctx, field)
+			case "itemType":
+				return ec.fieldContext_StarredFolder_itemType(ctx, field)
+			case "itemId":
+				return ec.fieldContext_StarredFolder_itemId(ctx, field)
+			case "starredAt":
+				return ec.fieldContext_StarredFolder_starredAt(ctx, field)
+			case "folder":
+				return ec.fieldContext_StarredFolder_folder(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StarredFolder", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myStarredItems(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_myStarredItems,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.Query().MyStarredItems(ctx)
+		},
+		nil,
+		ec.marshalNStarredItem2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredItemᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_myStarredItems(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_StarredItem_id(ctx, field)
+			case "userId":
+				return ec.fieldContext_StarredItem_userId(ctx, field)
+			case "itemType":
+				return ec.fieldContext_StarredItem_itemType(ctx, field)
+			case "itemId":
+				return ec.fieldContext_StarredItem_itemId(ctx, field)
+			case "starredAt":
+				return ec.fieldContext_StarredItem_starredAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type StarredItem", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8455,6 +8997,527 @@ func (ec *executionContext) fieldContext_SharedFolderWithMe_owner(_ context.Cont
 				return ec.fieldContext_User_isAdmin(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_id(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_userId(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_itemType(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_itemType,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_itemType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_itemId(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_itemId,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_itemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_starredAt(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_starredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.StarredAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_starredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFile_file(ctx context.Context, field graphql.CollectedField, obj *model.StarredFile) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFile_file,
+		func(ctx context.Context) (any, error) {
+			return obj.File, nil
+		},
+		nil,
+		ec.marshalNFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFile,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFile_file(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFile",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_File_id(ctx, field)
+			case "hash":
+				return ec.fieldContext_File_hash(ctx, field)
+			case "originalName":
+				return ec.fieldContext_File_originalName(ctx, field)
+			case "mimeType":
+				return ec.fieldContext_File_mimeType(ctx, field)
+			case "size":
+				return ec.fieldContext_File_size(ctx, field)
+			case "refCount":
+				return ec.fieldContext_File_refCount(ctx, field)
+			case "visibility":
+				return ec.fieldContext_File_visibility(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_File_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type File", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_id(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_userId(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_itemType(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_itemType,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_itemType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_itemId(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_itemId,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_itemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_starredAt(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_starredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.StarredAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_starredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredFolder_folder(ctx context.Context, field graphql.CollectedField, obj *model.StarredFolder) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredFolder_folder,
+		func(ctx context.Context) (any, error) {
+			return obj.Folder, nil
+		},
+		nil,
+		ec.marshalNFolder2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐFolder,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredFolder_folder(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredFolder",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Folder_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Folder_name(ctx, field)
+			case "parentId":
+				return ec.fieldContext_Folder_parentId(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_Folder_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Folder", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredItem_id(ctx context.Context, field graphql.CollectedField, obj *model.StarredItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredItem_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredItem_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredItem_userId(ctx context.Context, field graphql.CollectedField, obj *model.StarredItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredItem_userId,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredItem_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredItem_itemType(ctx context.Context, field graphql.CollectedField, obj *model.StarredItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredItem_itemType,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemType, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredItem_itemType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredItem_itemId(ctx context.Context, field graphql.CollectedField, obj *model.StarredItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredItem_itemId,
+		func(ctx context.Context) (any, error) {
+			return obj.ItemID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredItem_itemId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StarredItem_starredAt(ctx context.Context, field graphql.CollectedField, obj *model.StarredItem) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_StarredItem_starredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.StarredAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_StarredItem_starredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StarredItem",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -11848,6 +12911,34 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "starFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_starFile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unstarFile":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unstarFile(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "starFolder":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_starFolder(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "unstarFolder":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_unstarFolder(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12678,6 +13769,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myStarredFiles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myStarredFiles(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myStarredFolders":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myStarredFolders(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myStarredItems":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myStarredItems(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -12895,6 +14052,193 @@ func (ec *executionContext) _SharedFolderWithMe(ctx context.Context, sel ast.Sel
 			}
 		case "owner":
 			out.Values[i] = ec._SharedFolderWithMe_owner(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var starredFileImplementors = []string{"StarredFile"}
+
+func (ec *executionContext) _StarredFile(ctx context.Context, sel ast.SelectionSet, obj *model.StarredFile) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, starredFileImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StarredFile")
+		case "id":
+			out.Values[i] = ec._StarredFile_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._StarredFile_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemType":
+			out.Values[i] = ec._StarredFile_itemType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemId":
+			out.Values[i] = ec._StarredFile_itemId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "starredAt":
+			out.Values[i] = ec._StarredFile_starredAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "file":
+			out.Values[i] = ec._StarredFile_file(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var starredFolderImplementors = []string{"StarredFolder"}
+
+func (ec *executionContext) _StarredFolder(ctx context.Context, sel ast.SelectionSet, obj *model.StarredFolder) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, starredFolderImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StarredFolder")
+		case "id":
+			out.Values[i] = ec._StarredFolder_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._StarredFolder_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemType":
+			out.Values[i] = ec._StarredFolder_itemType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemId":
+			out.Values[i] = ec._StarredFolder_itemId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "starredAt":
+			out.Values[i] = ec._StarredFolder_starredAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "folder":
+			out.Values[i] = ec._StarredFolder_folder(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var starredItemImplementors = []string{"StarredItem"}
+
+func (ec *executionContext) _StarredItem(ctx context.Context, sel ast.SelectionSet, obj *model.StarredItem) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, starredItemImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StarredItem")
+		case "id":
+			out.Values[i] = ec._StarredItem_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userId":
+			out.Values[i] = ec._StarredItem_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemType":
+			out.Values[i] = ec._StarredItem_itemType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "itemId":
+			out.Values[i] = ec._StarredItem_itemId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "starredAt":
+			out.Values[i] = ec._StarredItem_starredAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -14227,6 +15571,168 @@ func (ec *executionContext) marshalNSharedFolderWithMe2ᚖgithubᚗcomᚋuseradi
 func (ec *executionContext) unmarshalNSignupInput2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐSignupInput(ctx context.Context, v any) (model.SignupInput, error) {
 	res, err := ec.unmarshalInputSignupInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNStarredFile2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFileᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.StarredFile) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStarredFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFile(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNStarredFile2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFile(ctx context.Context, sel ast.SelectionSet, v *model.StarredFile) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StarredFile(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStarredFolder2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFolderᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.StarredFolder) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStarredFolder2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFolder(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNStarredFolder2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredFolder(ctx context.Context, sel ast.SelectionSet, v *model.StarredFolder) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StarredFolder(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNStarredItem2ᚕᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.StarredItem) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNStarredItem2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredItem(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNStarredItem2ᚖgithubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStarredItem(ctx context.Context, sel ast.SelectionSet, v *model.StarredItem) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._StarredItem(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNStorageUsage2githubᚗcomᚋuseradityaaᚋgraphᚋmodelᚐStorageUsage(ctx context.Context, sel ast.SelectionSet, v model.StorageUsage) graphql.Marshaler {

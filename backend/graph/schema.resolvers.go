@@ -675,6 +675,118 @@ func (r *mutationResolver) TrackFileActivity(ctx context.Context, fileID string,
 	return true, nil
 }
 
+// StarFile is the resolver for the starFile field.
+func (r *mutationResolver) StarFile(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+
+	if r.StarredService == nil {
+		return false, fmt.Errorf("starred service not configured")
+	}
+
+	err = r.StarredService.StarFile(ctx, userID, fileUUID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// UnstarFile is the resolver for the unstarFile field.
+func (r *mutationResolver) UnstarFile(ctx context.Context, fileID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+
+	fileUUID, err := uuid.Parse(fileID)
+	if err != nil {
+		return false, fmt.Errorf("invalid file id")
+	}
+
+	if r.StarredService == nil {
+		return false, fmt.Errorf("starred service not configured")
+	}
+
+	err = r.StarredService.UnstarFile(ctx, userID, fileUUID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// StarFolder is the resolver for the starFolder field.
+func (r *mutationResolver) StarFolder(ctx context.Context, folderID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder id")
+	}
+
+	if r.StarredService == nil {
+		return false, fmt.Errorf("starred service not configured")
+	}
+
+	err = r.StarredService.StarFolder(ctx, userID, folderUUID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// UnstarFolder is the resolver for the unstarFolder field.
+func (r *mutationResolver) UnstarFolder(ctx context.Context, folderID string) (bool, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder id")
+	}
+
+	if r.StarredService == nil {
+		return false, fmt.Errorf("starred service not configured")
+	}
+
+	err = r.StarredService.UnstarFolder(ctx, userID, folderUUID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
 // Health is the resolver for the _health field.
 func (r *queryResolver) Health(ctx context.Context) (string, error) {
 	return "ok", nil
@@ -1971,6 +2083,138 @@ func (r *queryResolver) MyRecentFileActivities(ctx context.Context, limit *int) 
 	}
 
 	return gqlActivities, nil
+}
+
+// MyStarredFiles is the resolver for the myStarredFiles field.
+func (r *queryResolver) MyStarredFiles(ctx context.Context) ([]*model.StarredFile, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+
+	if r.StarredService == nil {
+		return nil, fmt.Errorf("starred service not configured")
+	}
+
+	fmt.Printf("DEBUG: Fetching starred files for user ID: %s\n", userID.String())
+	starredFiles, err := r.StarredService.GetStarredFiles(ctx, userID)
+	if err != nil {
+		fmt.Printf("DEBUG: Error fetching starred files: %v\n", err)
+		return nil, err
+	}
+
+	fmt.Printf("DEBUG: Found %d starred files\n", len(starredFiles))
+
+	var result []*model.StarredFile
+	for _, sf := range starredFiles {
+		result = append(result, &model.StarredFile{
+			ID:        sf.ID.String(),
+			UserID:    sf.UserID.String(),
+			ItemType:  sf.ItemType,
+			ItemID:    sf.ItemID.String(),
+			StarredAt: sf.StarredAt.Format(time.RFC3339),
+			File: &model.File{
+				ID:           sf.File.ID.String(),
+				Hash:         sf.File.Hash,
+				OriginalName: sf.File.OriginalName,
+				MimeType:     sf.File.MimeType,
+				Size:         int(sf.File.Size),
+				RefCount:     sf.File.RefCount,
+				Visibility:   sf.File.Visibility,
+				CreatedAt:    sf.File.CreatedAt.Format(time.RFC3339),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// MyStarredFolders is the resolver for the myStarredFolders field.
+func (r *queryResolver) MyStarredFolders(ctx context.Context) ([]*model.StarredFolder, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+
+	if r.StarredService == nil {
+		return nil, fmt.Errorf("starred service not configured")
+	}
+
+	fmt.Printf("DEBUG: Fetching starred folders for user ID: %s\n", userID.String())
+	starredFolders, err := r.StarredService.GetStarredFolders(ctx, userID)
+	if err != nil {
+		fmt.Printf("DEBUG: Error fetching starred folders: %v\n", err)
+		return nil, err
+	}
+
+	fmt.Printf("DEBUG: Found %d starred folders\n", len(starredFolders))
+
+	var result []*model.StarredFolder
+	for _, sf := range starredFolders {
+		var parentID *string
+		if sf.Folder.ParentID != nil {
+			parentIDStr := sf.Folder.ParentID.String()
+			parentID = &parentIDStr
+		}
+
+		result = append(result, &model.StarredFolder{
+			ID:        sf.ID.String(),
+			UserID:    sf.UserID.String(),
+			ItemType:  sf.ItemType,
+			ItemID:    sf.ItemID.String(),
+			StarredAt: sf.StarredAt.Format(time.RFC3339),
+			Folder: &model.Folder{
+				ID:        sf.Folder.ID.String(),
+				Name:      sf.Folder.Name,
+				ParentID:  parentID,
+				CreatedAt: sf.Folder.CreatedAt.Format(time.RFC3339),
+			},
+		})
+	}
+
+	return result, nil
+}
+
+// MyStarredItems is the resolver for the myStarredItems field.
+func (r *queryResolver) MyStarredItems(ctx context.Context) ([]*model.StarredItem, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+
+	if r.StarredService == nil {
+		return nil, fmt.Errorf("starred service not configured")
+	}
+
+	starredItems, err := r.StarredService.GetAllStarredItems(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*model.StarredItem
+	for _, si := range starredItems {
+		result = append(result, &model.StarredItem{
+			ID:        si.ID.String(),
+			UserID:    si.UserID.String(),
+			ItemType:  si.ItemType,
+			ItemID:    si.ItemID.String(),
+			StarredAt: si.StarredAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
 }
 
 // Mutation returns MutationResolver implementation.

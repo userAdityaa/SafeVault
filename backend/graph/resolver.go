@@ -12,4 +12,5 @@ type Resolver struct {
 	AdminService        *services.AdminService
 	FileDownloadService *services.FileDownloadService
 	FileActivityService *services.FileActivityService
+	StarredService      *services.StarredService
 }

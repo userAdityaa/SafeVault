@@ -77,6 +77,12 @@ type Mutation {
 
   # File activity tracking mutations
   trackFileActivity(fileId: ID!, activityType: String!): Boolean!
+
+  # Starred items mutations
+  starFile(fileId: ID!): Boolean!
+  unstarFile(fileId: ID!): Boolean!
+  starFolder(folderId: ID!): Boolean!
+  unstarFolder(folderId: ID!): Boolean!
 }
 
 type User {
@@ -149,6 +155,11 @@ type Query {
 
   # File activity tracking queries
   myRecentFileActivities(limit: Int): [RecentFileActivity!]!
+
+  # Starred items queries
+  myStarredFiles: [StarredFile!]!
+  myStarredFolders: [StarredFolder!]!
+  myStarredItems: [StarredItem!]!
 }
 
 type StorageUsage {
@@ -343,4 +354,31 @@ type RecentFileActivity {
   lastActivityAt: String!
   activityCount: Int!
   file: File!
+}
+
+# Starred items types
+type StarredItem {
+  id: ID!
+  userId: ID!
+  itemType: String! # "file" or "folder"
+  itemId: ID!
+  starredAt: String!
+}
+
+type StarredFile {
+  id: ID!
+  userId: ID!
+  itemType: String!
+  itemId: ID!
+  starredAt: String!
+  file: File!
+}
+
+type StarredFolder {
+  id: ID!
+  userId: ID!
+  itemType: String!
+  itemId: ID!
+  starredAt: String!
+  folder: Folder!
 }

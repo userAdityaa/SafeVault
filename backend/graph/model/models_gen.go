@@ -225,6 +225,32 @@ type SignupInput struct {
 	Password string `json:"password"`
 }
 
+type StarredFile struct {
+	ID        string `json:"id"`
+	UserID    string `json:"userId"`
+	ItemType  string `json:"itemType"`
+	ItemID    string `json:"itemId"`
+	StarredAt string `json:"starredAt"`
+	File      *File  `json:"file"`
+}
+
+type StarredFolder struct {
+	ID        string  `json:"id"`
+	UserID    string  `json:"userId"`
+	ItemType  string  `json:"itemType"`
+	ItemID    string  `json:"itemId"`
+	StarredAt string  `json:"starredAt"`
+	Folder    *Folder `json:"folder"`
+}
+
+type StarredItem struct {
+	ID        string `json:"id"`
+	UserID    string `json:"userId"`
+	ItemType  string `json:"itemType"`
+	ItemID    string `json:"itemId"`
+	StarredAt string `json:"starredAt"`
+}
+
 type StorageUsage struct {
 	UsedBytes      int     `json:"usedBytes"`
 	QuotaBytes     int     `json:"quotaBytes"`
