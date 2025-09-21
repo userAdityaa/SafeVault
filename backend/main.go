@@ -47,6 +47,7 @@ func main() {
 	shareRepo := repository.NewShareRepository(db)
 	publicLinkRepo := repository.NewPublicLinkRepository(db)
 	fileDownloadRepo := repository.NewFileDownloadRepository(db)
+	starredRepo := repository.NewStarredRepository(db)
 
 	folderService := services.NewFolderService(folderRepo)
 
@@ -101,6 +102,9 @@ func main() {
 	fileActivityRepo := repository.NewFileActivityRepository(db)
 	fileActivityService := services.NewFileActivityService(fileActivityRepo, fileRepo)
 
+	// Initialize starred service
+	starredService := services.NewStarredService(starredRepo, fileRepo, folderRepo)
+
 	// Create GraphQL server
 	srv := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
@@ -113,6 +117,7 @@ func main() {
 			AdminService:        adminService,
 			FileDownloadService: fileDownloadService,
 			FileActivityService: fileActivityService,
+			StarredService:      starredService,
 		},
 	}))
 
