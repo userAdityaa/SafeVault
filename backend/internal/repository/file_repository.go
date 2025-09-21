@@ -21,6 +21,7 @@ type FileRepository interface {
 	DecrementRefCount(ctx context.Context, fileID uuid.UUID) error
 	// Note: userID can be from users or google_users; FK relaxed
 	AddUserFile(ctx context.Context, userID, fileID uuid.UUID, role string) (bool, error)
+	AddUserFileWithFolder(ctx context.Context, userID, fileID uuid.UUID, role string, folderID *uuid.UUID) (bool, error)
 	GetUserFiles(ctx context.Context, userID uuid.UUID) ([]models.UserFile, error)
 	DeleteUserFile(ctx context.Context, userID, fileID uuid.UUID) error
 	// New helpers
@@ -37,6 +38,7 @@ type FileRepository interface {
 	UserHasActiveMapping(ctx context.Context, userID, fileID uuid.UUID) (bool, error)
 	// New for duplicate mappings per user
 	CreateUserFileMapping(ctx context.Context, userID, fileID uuid.UUID, role string) (uuid.UUID, error)
+	CreateUserFileMappingWithFolder(ctx context.Context, userID, fileID uuid.UUID, role string, folderID *uuid.UUID) (uuid.UUID, error)
 	GetUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) (*models.UserFile, error)
 	SoftDeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
 	DeleteUserFileByMappingID(ctx context.Context, userID uuid.UUID, mappingID uuid.UUID) error
@@ -149,10 +151,54 @@ func (r *fileRepository) AddUserFile(ctx context.Context, userID, fileID uuid.UU
 	return true, nil
 }
 
+// AddUserFileWithFolder creates a user-file association with folder assignment, preferring to restore soft-deleted ones
+func (r *fileRepository) AddUserFileWithFolder(ctx context.Context, userID, fileID uuid.UUID, role string, folderID *uuid.UUID) (bool, error) {
+	// Try to restore the most recent soft-deleted mapping first
+	var restoredID uuid.UUID
+	err := r.DB.QueryRow(ctx, `
+		UPDATE user_files uf
+		SET deleted_at = NULL, uploaded_at = $3, role = $4, folder_id = $5
+		WHERE uf.id = (
+			SELECT id FROM user_files
+			WHERE user_id = $1 AND file_id = $2 AND deleted_at IS NOT NULL
+			ORDER BY uploaded_at DESC
+			LIMIT 1
+		)
+		RETURNING uf.id
+	`, userID, fileID, time.Now(), role, folderID).Scan(&restoredID)
+	if err == nil {
+		// restored one mapping
+		return true, nil
+	}
+	// Check if there is any active mapping already
+	var activeID uuid.UUID
+	err = r.DB.QueryRow(ctx, `SELECT id FROM user_files WHERE user_id=$1 AND file_id=$2 AND deleted_at IS NULL LIMIT 1`, userID, fileID).Scan(&activeID)
+	if err == nil {
+		// active mapping exists; not inserted
+		return false, nil
+	}
+	// No active mapping and nothing to restore; insert a new mapping
+	id := uuid.New()
+	if _, err := r.DB.Exec(ctx, `INSERT INTO user_files (id, user_id, file_id, role, uploaded_at, folder_id) VALUES ($1,$2,$3,$4,$5,$6)`, id, userID, fileID, role, time.Now(), folderID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // CreateUserFileMapping inserts a new mapping row regardless of existing ones
 func (r *fileRepository) CreateUserFileMapping(ctx context.Context, userID, fileID uuid.UUID, role string) (uuid.UUID, error) {
 	id := uuid.New()
 	_, err := r.DB.Exec(ctx, `INSERT INTO user_files (id, user_id, file_id, role, uploaded_at) VALUES ($1,$2,$3,$4,$5)`, id, userID, fileID, role, time.Now())
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return id, nil
+}
+
+// CreateUserFileMappingWithFolder inserts a new mapping row with folder assignment
+func (r *fileRepository) CreateUserFileMappingWithFolder(ctx context.Context, userID, fileID uuid.UUID, role string, folderID *uuid.UUID) (uuid.UUID, error) {
+	id := uuid.New()
+	_, err := r.DB.Exec(ctx, `INSERT INTO user_files (id, user_id, file_id, role, uploaded_at, folder_id) VALUES ($1,$2,$3,$4,$5,$6)`, id, userID, fileID, role, time.Now(), folderID)
 	if err != nil {
 		return uuid.Nil, err
 	}

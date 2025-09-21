@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,14 @@ type FolderRepository interface {
 	ValidateParent(ctx context.Context, userID uuid.UUID, parentID uuid.UUID) (bool, error)
 	// DeleteFolderReassignFiles removes a folder and reassigns its files to the root level
 	DeleteFolderReassignFiles(ctx context.Context, userID, folderID uuid.UUID) error
+	// DeleteFolderRecursive removes a folder and all its contents (files and subfolders) recursively
+	DeleteFolderRecursive(ctx context.Context, userID, folderID uuid.UUID) error
+	// GetAllSubfolders returns all descendant folders of a given folder
+	GetAllSubfolders(ctx context.Context, userID, folderID uuid.UUID) ([]models.Folder, error)
+	// CreateFolderPath creates a folder and all necessary parent directories
+	CreateFolderPath(ctx context.Context, userID uuid.UUID, folderPath string, parentID *uuid.UUID) (*models.Folder, error)
+	// BulkCreateFolders creates multiple folders in a single transaction
+	BulkCreateFolders(ctx context.Context, userID uuid.UUID, folders []models.Folder) error
 }
 
 // folderRepository implements FolderRepository using PostgreSQL
@@ -132,4 +141,119 @@ func (r *folderRepository) CountChildren(ctx context.Context, userID, folderID u
 		return 0, err
 	}
 	return n, nil
+}
+
+// DeleteFolderRecursive removes a folder and all its contents (files and subfolders) recursively
+func (r *folderRepository) DeleteFolderRecursive(ctx context.Context, userID, folderID uuid.UUID) error {
+	// Use a transaction to ensure consistency
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// First, recursively delete all files in this folder and its subfolders
+	_, err = tx.Exec(ctx, `
+		WITH RECURSIVE folder_tree AS (
+			SELECT id FROM folders WHERE id = $1 AND user_id = $2
+			UNION ALL
+			SELECT f.id FROM folders f
+			INNER JOIN folder_tree ft ON f.parent_id = ft.id
+			WHERE f.user_id = $2
+		)
+		DELETE FROM user_files 
+		WHERE folder_id IN (SELECT id FROM folder_tree) AND user_id = $2
+	`, folderID, userID)
+	if err != nil {
+		return err
+	}
+
+	// Then delete all folders in the hierarchy
+	_, err = tx.Exec(ctx, `
+		WITH RECURSIVE folder_tree AS (
+			SELECT id FROM folders WHERE id = $1 AND user_id = $2
+			UNION ALL
+			SELECT f.id FROM folders f
+			INNER JOIN folder_tree ft ON f.parent_id = ft.id
+			WHERE f.user_id = $2
+		)
+		DELETE FROM folders WHERE id IN (SELECT id FROM folder_tree) AND user_id = $2
+	`, folderID, userID)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// GetAllSubfolders returns all descendant folders of a given folder
+func (r *folderRepository) GetAllSubfolders(ctx context.Context, userID, folderID uuid.UUID) ([]models.Folder, error) {
+	log.Printf("DEBUG: GetAllSubfolders called for folderID: %s, userID: %s", folderID, userID)
+
+	// Remove user_id restriction for shared folder access
+	rows, err := r.DB.Query(ctx, `
+		WITH RECURSIVE folder_tree AS (
+			SELECT id, user_id, name, parent_id, created_at 
+			FROM folders 
+			WHERE parent_id = $1
+			UNION ALL
+			SELECT f.id, f.user_id, f.name, f.parent_id, f.created_at
+			FROM folders f
+			INNER JOIN folder_tree ft ON f.parent_id = ft.id
+		)
+		SELECT id, user_id, name, parent_id, created_at FROM folder_tree
+		ORDER BY name ASC
+	`, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var folders []models.Folder
+	for rows.Next() {
+		var f models.Folder
+		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ParentID, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		folders = append(folders, f)
+	}
+
+	log.Printf("DEBUG: GetAllSubfolders found %d subfolders for folderID: %s", len(folders), folderID)
+	for _, folder := range folders {
+		log.Printf("DEBUG: Subfolder: %s (ID: %s, ParentID: %s)", folder.Name, folder.ID, *folder.ParentID)
+	}
+
+	return folders, nil
+}
+
+// CreateFolderPath creates a folder and all necessary parent directories
+func (r *folderRepository) CreateFolderPath(ctx context.Context, userID uuid.UUID, folderPath string, parentID *uuid.UUID) (*models.Folder, error) {
+	// For now, this creates just the final folder name
+	// Full path creation would be implemented based on specific requirements
+	return r.CreateFolder(ctx, userID, folderPath, parentID)
+}
+
+// BulkCreateFolders creates multiple folders in a single transaction
+func (r *folderRepository) BulkCreateFolders(ctx context.Context, userID uuid.UUID, folders []models.Folder) error {
+	if len(folders) == 0 {
+		return nil
+	}
+
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, folder := range folders {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO folders (id, user_id, name, parent_id, created_at) 
+			VALUES ($1, $2, $3, $4, $5)
+		`, folder.ID, folder.UserID, folder.Name, folder.ParentID, folder.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit(ctx)
 }

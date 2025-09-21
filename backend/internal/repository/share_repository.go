@@ -28,6 +28,7 @@ type ShareRepository interface {
 
 	// Get folder contents
 	GetFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error)
+	GetDirectSubfolders(ctx context.Context, folderID uuid.UUID) ([]models.Folder, error)
 }
 
 type shareRepository struct {
@@ -322,7 +323,7 @@ func (r *shareRepository) HasFolderAccess(ctx context.Context, userID uuid.UUID,
 		return true, role, nil
 	}
 
-	// Check if folder is shared with user
+	// Check if folder is directly shared with user
 	query = `SELECT permission FROM folder_shares WHERE folder_id = $1 AND shared_with_email = $2 AND (expires_at IS NULL OR expires_at > NOW())`
 	var permission string
 	err = r.DB.QueryRow(ctx, query, folderID, userEmail).Scan(&permission)
@@ -330,11 +331,56 @@ func (r *shareRepository) HasFolderAccess(ctx context.Context, userID uuid.UUID,
 		return true, permission, nil
 	}
 
+	// Check if user has access to any parent folder (recursive check)
+	hasParentAccess, parentPermission, err := r.hasParentFolderAccess(ctx, userID, userEmail, folderID)
+	if err != nil {
+		return false, "", err
+	}
+	if hasParentAccess {
+		return true, parentPermission, nil
+	}
+
 	return false, "", nil
 }
 
+// hasParentFolderAccess checks if user has access to any parent folder
+func (r *shareRepository) hasParentFolderAccess(ctx context.Context, userID uuid.UUID, userEmail string, folderID uuid.UUID) (bool, string, error) {
+	// Get the parent folder ID
+	var parentID *uuid.UUID
+	query := `SELECT parent_id FROM folders WHERE id = $1`
+	err := r.DB.QueryRow(ctx, query, folderID).Scan(&parentID)
+	if err != nil {
+		// If there's an error or no parent, no inherited access
+		return false, "", nil
+	}
+
+	if parentID == nil {
+		// Reached root level, no inherited access
+		return false, "", nil
+	}
+
+	// Check if user owns the parent folder
+	query = `SELECT 'owner' FROM folders WHERE user_id = $1 AND id = $2`
+	var role string
+	err = r.DB.QueryRow(ctx, query, userID, *parentID).Scan(&role)
+	if err == nil {
+		return true, role, nil
+	}
+
+	// Check if parent folder is shared with user
+	query = `SELECT permission FROM folder_shares WHERE folder_id = $1 AND shared_with_email = $2 AND (expires_at IS NULL OR expires_at > NOW())`
+	var permission string
+	err = r.DB.QueryRow(ctx, query, *parentID, userEmail).Scan(&permission)
+	if err == nil {
+		return true, permission, nil
+	}
+
+	// Recursively check the parent's parent
+	return r.hasParentFolderAccess(ctx, userID, userEmail, *parentID)
+}
+
 func (r *shareRepository) GetFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error) {
-	// Get files in the folder by joining with the folder's owner
+	// Get files in the folder - remove user_id restriction for shared access
 	query := `
 		SELECT 
 			uf.id, uf.user_id, uf.file_id, uf.uploaded_at,
@@ -349,7 +395,6 @@ func (r *shareRepository) GetFolderFiles(ctx context.Context, folderID uuid.UUID
 		LEFT JOIN google_users gu ON uf.user_id = gu.id 
 		WHERE uf.folder_id = $1 
 		  AND uf.deleted_at IS NULL
-		  AND uf.user_id = fo.user_id
 		ORDER BY uf.uploaded_at DESC`
 
 	rows, err := r.DB.Query(ctx, query, folderID)
@@ -382,4 +427,29 @@ func (r *shareRepository) GetFolderFiles(ctx context.Context, folderID uuid.UUID
 	}
 
 	return files, rows.Err()
+}
+
+// GetDirectSubfolders returns direct subfolders of a given folder (not recursive, no user filtering)
+func (r *shareRepository) GetDirectSubfolders(ctx context.Context, folderID uuid.UUID) ([]models.Folder, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT id, user_id, name, parent_id, created_at 
+		FROM folders 
+		WHERE parent_id = $1 
+		ORDER BY name ASC
+	`, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var folders []models.Folder
+	for rows.Next() {
+		var f models.Folder
+		if err := rows.Scan(&f.ID, &f.UserID, &f.Name, &f.ParentID, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		folders = append(folders, f)
+	}
+
+	return folders, rows.Err()
 }
