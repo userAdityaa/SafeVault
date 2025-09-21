@@ -219,7 +219,7 @@ func (s *ShareService) HasFolderAccess(ctx context.Context, userID uuid.UUID, us
 	return s.ShareRepo.HasFolderAccess(ctx, userID, userEmail, folderID)
 }
 
-// GetSharedFolderFiles gets files within a shared folder that the user has access to
+// GetSharedFolderFiles gets files within a shared folder that the user has access to (direct files only, not recursive)
 func (s *ShareService) GetSharedFolderFiles(ctx context.Context, userID uuid.UUID, folderID uuid.UUID) ([]models.UserFile, error) {
 	// Get user email for access check
 	userEmail, err := s.UserRepo.GetUserEmailByID(ctx, userID.String())
@@ -242,22 +242,88 @@ func (s *ShareService) GetSharedFolderFiles(ctx context.Context, userID uuid.UUI
 
 	log.Printf("DEBUG: User %s has %s access to folder %s", userEmail, role, folderID)
 
-	// Get files in the folder
+	// Get only direct files in the folder (not recursive)
 	files, err := s.ShareRepo.GetFolderFiles(ctx, folderID)
 	if err != nil {
 		log.Printf("DEBUG: Error getting folder files: %v", err)
 		return nil, fmt.Errorf("failed to get folder files: %w", err)
 	}
 
-	log.Printf("DEBUG: Found %d files in folder %s", len(files), folderID)
+	log.Printf("DEBUG: Found %d direct files in folder %s", len(files), folderID)
 
 	return files, nil
 }
 
+// GetSharedFolderSubfolders gets direct subfolders within a shared folder that the user has access to
+func (s *ShareService) GetSharedFolderSubfolders(ctx context.Context, userID uuid.UUID, folderID uuid.UUID) ([]models.Folder, error) {
+	// Get user email for access check
+	userEmail, err := s.UserRepo.GetUserEmailByID(ctx, userID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user email: %w", err)
+	}
+
+	// Check if user has access to the folder
+	hasAccess, _, err := s.HasFolderAccess(ctx, userID, userEmail, folderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check folder access: %w", err)
+	}
+	if !hasAccess {
+		return nil, fmt.Errorf("access denied to folder")
+	}
+
+	// Get direct subfolders (not recursive) without user_id filtering
+	subfolders, err := s.ShareRepo.GetDirectSubfolders(ctx, folderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subfolders: %w", err)
+	}
+
+	log.Printf("DEBUG: Found %d direct subfolders in shared folder %s", len(subfolders), folderID)
+
+	return subfolders, nil
+}
+
+// GetAllFolderFilesRecursively gets all files from a folder and its nested subfolders
+func (s *ShareService) GetAllFolderFilesRecursively(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error) {
+	var allFiles []models.UserFile
+
+	log.Printf("DEBUG: GetAllFolderFilesRecursively called for folder %s", folderID)
+
+	// Get files directly in this folder
+	files, err := s.ShareRepo.GetFolderFiles(ctx, folderID)
+	if err != nil {
+		log.Printf("DEBUG: Error getting folder files for %s: %v", folderID, err)
+		return nil, fmt.Errorf("failed to get folder files: %w", err)
+	}
+	log.Printf("DEBUG: Found %d direct files in folder %s", len(files), folderID)
+	allFiles = append(allFiles, files...)
+
+	// Get all subfolders
+	subfolders, err := s.FolderRepo.GetAllSubfolders(ctx, uuid.Nil, folderID) // We don't filter by user since we're in a sharing context
+	if err != nil {
+		log.Printf("DEBUG: Error getting subfolders for %s: %v", folderID, err)
+		return nil, fmt.Errorf("failed to get subfolders: %w", err)
+	}
+	log.Printf("DEBUG: Found %d subfolders in folder %s", len(subfolders), folderID)
+
+	// Recursively get files from each subfolder
+	for _, subfolder := range subfolders {
+		log.Printf("DEBUG: Recursively checking subfolder %s (name: %s)", subfolder.ID, subfolder.Name)
+		subfolderFiles, err := s.GetAllFolderFilesRecursively(ctx, subfolder.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get files from subfolder %s: %w", subfolder.ID, err)
+		}
+		log.Printf("DEBUG: Found %d files in subfolder %s", len(subfolderFiles), subfolder.ID)
+		allFiles = append(allFiles, subfolderFiles...)
+	}
+
+	log.Printf("DEBUG: Total files found in folder %s (including subfolders): %d", folderID, len(allFiles))
+	return allFiles, nil
+}
+
 // GetPublicFolderFiles gets files within a public folder (no access check needed since it's public)
 func (s *ShareService) GetPublicFolderFiles(ctx context.Context, folderID uuid.UUID) ([]models.UserFile, error) {
-	// Get files in the folder directly from repository
-	files, err := s.ShareRepo.GetFolderFiles(ctx, folderID)
+	// Get files in the folder and all nested subfolders
+	files, err := s.GetAllFolderFilesRecursively(ctx, folderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder files: %w", err)
 	}

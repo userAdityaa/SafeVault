@@ -86,6 +86,21 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 	}
 
 	var results []models.UserFile
+
+	// Check if we have a target folder from context (for folder uploads)
+	var targetFolderID *uuid.UUID
+	if folderIDValue := ctx.Value("targetFolderID"); folderIDValue != nil {
+		fmt.Printf("DEBUG: Context value found, type: %T, value: %v\n", folderIDValue, folderIDValue)
+		if folderID, ok := folderIDValue.(uuid.UUID); ok {
+			targetFolderID = &folderID
+			fmt.Printf("DEBUG: File service received targetFolderID from context: %s\n", folderID.String())
+		} else {
+			fmt.Printf("DEBUG: Type assertion failed for targetFolderID\n")
+		}
+	} else {
+		fmt.Printf("DEBUG: No targetFolderID found in context\n")
+	}
+
 	for _, up := range uploads {
 		if up == nil || up.File == nil {
 			return nil, fmt.Errorf("invalid upload input")
@@ -156,7 +171,15 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			if dbFile == nil {
 				return nil, fmt.Errorf("file record missing for existing mapping")
 			}
-			mappingID, err := s.FileRepo.CreateUserFileMapping(ctx, userID, dbFile.ID, "owner")
+			// Use folder-aware mapping creation if target folder is specified
+			var mappingID uuid.UUID
+			if targetFolderID != nil {
+				fmt.Printf("DEBUG: Creating user file mapping with folder: %s\n", targetFolderID.String())
+				mappingID, err = s.FileRepo.CreateUserFileMappingWithFolder(ctx, userID, dbFile.ID, "owner", targetFolderID)
+			} else {
+				fmt.Printf("DEBUG: Creating user file mapping without folder (root)\n")
+				mappingID, err = s.FileRepo.CreateUserFileMapping(ctx, userID, dbFile.ID, "owner")
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -205,7 +228,15 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 		// Map to user
 		// Upsert mapping and handle ref_count increment only for first reference by this user
 		prevStatus, _ := s.FileRepo.GetUserFileMappingStatus(ctx, userID, dbFile.ID)
-		if inserted, err := s.FileRepo.AddUserFile(ctx, userID, dbFile.ID, "owner"); err != nil {
+		var inserted bool
+		if targetFolderID != nil {
+			fmt.Printf("DEBUG: Adding user file with folder: %s for existing file\n", targetFolderID.String())
+			inserted, err = s.FileRepo.AddUserFileWithFolder(ctx, userID, dbFile.ID, "owner", targetFolderID)
+		} else {
+			fmt.Printf("DEBUG: Adding user file without folder (root) for existing file\n")
+			inserted, err = s.FileRepo.AddUserFile(ctx, userID, dbFile.ID, "owner")
+		}
+		if err != nil {
 			return nil, err
 		} else if !inserted {
 			if ufExisting, _ := s.FindUserFileByHash(ctx, userID, hash); ufExisting != nil {
