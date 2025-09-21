@@ -5,7 +5,6 @@ npm-debug.log
 README.md
 .env.local
 .env.production.local
-.env
 .git
 .gitignore
 .next
