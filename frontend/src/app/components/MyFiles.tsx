@@ -304,11 +304,17 @@ export default function MyFiles() {
             await fetchFolders(targetId);
             await fetchFolderFiles(targetId);
         }}
+        onNewFolder={() => setNewFolderModal({ open: true, name: "" })}
+        onGoToRoot={async () => {
+          setCurrentFolderId(null);
+          setCurrentFolderName(null);
+          setFolderPath([{ id: null, name: 'Root' }]);
+          await fetchFolders(null);
+          await fetchFolderFiles(null);
+        }}
+        currentFolderId={currentFolderId}
+        folderCruding={folderCruding}
       />
-      <div className="flex items-center gap-2 mb-5 -mt-16 mr-4 justify-end">
-        <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg" onClick={()=> setNewFolderModal({ open: true, name: "" })} disabled={folderCruding}>New Folder</button>
-        {currentFolderId && <button className="px-3 py-1.5 bg-gray-100 text-gray-800 rounded-lg" onClick={async ()=>{ setCurrentFolderId(null); setCurrentFolderName(null); setFolderPath([{ id:null, name:'Root'}]); await fetchFolders(null); await fetchFolderFiles(null); }}>Go to Root</button>}
-      </div>
 
       {/* Folders Grid */}
       <div className="mb-6 relative">

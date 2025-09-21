@@ -171,7 +171,7 @@ export default function Dashboard() {
               <Menu className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
             </button>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-900 truncate">
+              <h2 className="text-md sm:text-lg lg:text-2xl font-semibold text-gray-900 truncate">
                 {selectedOption}
               </h2>
               <p className="text-sm sm:text-base text-gray-500 truncate">
@@ -180,9 +180,6 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center space-x-3 sm:space-x-4 lg:space-x-6 flex-shrink-0">
-            <Bell className="w-5 h-5 text-gray-700 hidden sm:block" />
-            <Settings className="w-5 h-5 text-gray-700 hidden sm:block" />
-            
             {/* User Avatar Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button

@@ -190,16 +190,16 @@ export default function Login() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex flex-col lg:flex-row h-screen">
       {isLoading && (
         <div className="fixed inset-0 bg-white flex items-center justify-center z-1000">
           <Loader />
         </div>
       )}
-      <div className="flex-1 p-12 flex flex-col justify-center items-center">
-        <div className="text-center">
+      <div className="flex-1 p-6 lg:p-12 flex flex-col justify-center items-center min-h-screen lg:min-h-0">
+        <div className="text-center w-full max-w-sm">
           <h2 className="text-3xl font-bold mb-6">Log In</h2>
-          <form className="flex flex-col w-80" onSubmit={handleSubmit}>
+          <form className="flex flex-col w-full" onSubmit={handleSubmit}>
             <label className="mb-2 text-left">
               Email address <span className="text-red-600">*</span>
             </label>
@@ -227,10 +227,6 @@ export default function Login() {
             {errors.password && (
               <p className="text-red-600 mb-2 text-sm text-left">{errors.password}</p>
             )}
-
-            <a href="#" className="text-blue-500 no-underline mb-2">
-              Forgot password?
-            </a>
             <button
               type="submit"
               className="bg-blue-500 text-white p-2 rounded mt-5 hover:bg-blue-600 w-full"
@@ -252,15 +248,21 @@ export default function Login() {
             <div className="flex-1 border-t border-gray-300"></div>
           </div>
 
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => toast.error("Google Sign In Failed")}
-            useOneTap
-          />
+          <div className="w-full">
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => toast.error("Google Sign In Failed")}
+              useOneTap
+              size="large"
+              theme="outline"
+            />
+          </div>
+        </div>
         </div>
       </div>
 
-      <div className="flex-1 bg-[url('/login_texture.png')] bg-cover" />
+      <div className="hidden lg:block flex-1 bg-[url('/login_texture.png')] bg-cover" />
     </div>
   );
 }

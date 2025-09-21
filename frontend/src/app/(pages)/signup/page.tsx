@@ -123,12 +123,12 @@ export default function SignUp() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className="flex flex-col lg:flex-row h-screen">
       {/* Left Section with Sign-Up Form */}
-      <div className="flex-1 p-12 flex flex-col justify-center items-center">
-        <div className="text-center">
+      <div className="flex-1 p-6 lg:p-12 flex flex-col justify-center items-center min-h-screen lg:min-h-0">
+        <div className="text-center w-full max-w-sm">
           <h2 className="text-3xl font-bold mb-6">Sign Up</h2>
-          <form className="flex flex-col w-80" onSubmit={handleSubmit}>
+          <form className="flex flex-col w-full" onSubmit={handleSubmit}>
             <label className="mb-2 text-left">
               Email address <span className="text-red-600">*</span>
             </label>
@@ -167,10 +167,6 @@ export default function SignUp() {
               className="mb-1 p-2 border rounded"
             />
             {errors.confirmPassword && <p className="text-red-600 mb-2 text-sm text-left">{errors.confirmPassword}</p>}
-
-            <a href="#" className="text-blue-500 no-underline mb-2">
-              Forgot password?
-            </a>
             <button
               type="submit"
               className="bg-blue-500 text-white p-2 rounded mt-5 hover:bg-blue-600 w-full"
@@ -186,7 +182,7 @@ export default function SignUp() {
       </div>
 
       {/* Right Section with Texture */}
-      <div className="flex-1 bg-[url('/login_texture.png')] bg-cover" />
+      <div className="hidden lg:block flex-1 bg-[url('/login_texture.png')] bg-cover" />
     </div>
   );
 }
