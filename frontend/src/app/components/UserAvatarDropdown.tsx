@@ -4,17 +4,52 @@ import { useState, useRef, useEffect } from 'react'
 import { LogOut, User } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
+/**
+ * Props for the UserAvatarDropdown component.
+ */
 interface UserAvatarDropdownProps {
+  /** User data to display in the dropdown */
   user: {
+    /** Unique user identifier */
     id: string
+    /** User's email address */
     email: string
+    /** Display name (optional) */
     name?: string
+    /** Profile picture URL (optional) */
     picture?: string
+    /** Whether user authenticated via Google OAuth */
     isGoogle?: boolean
+    /** Whether user has admin privileges */
     isAdmin?: boolean
   }
 }
 
+/**
+ * User avatar dropdown component with logout functionality.
+ * 
+ * Displays a clickable avatar that opens a dropdown menu with user information
+ * and logout option. Handles click-outside behavior to close the dropdown.
+ * 
+ * Features:
+ * - Profile picture or initials display
+ * - Click-outside to close
+ * - User info display
+ * - Logout functionality
+ * 
+ * @component
+ * @param props - Component props
+ * @returns JSX element representing the user avatar dropdown
+ * 
+ * @example
+ * ```tsx
+ * const { user } = useAuth();
+ * 
+ * if (user) {
+ *   return <UserAvatarDropdown user={user} />;
+ * }
+ * ```
+ */
 export default function UserAvatarDropdown({ user }: UserAvatarDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -22,6 +57,10 @@ export default function UserAvatarDropdown({ user }: UserAvatarDropdownProps) {
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    /**
+     * Handles click events outside the dropdown to close it.
+     * @param event - Mouse click event
+     */
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
@@ -34,11 +73,18 @@ export default function UserAvatarDropdown({ user }: UserAvatarDropdownProps) {
     }
   }, [])
 
+  /**
+   * Gets the first letter of user's name or email for the avatar initial.
+   * @returns Single uppercase character for avatar display
+   */
   const getInitial = () => {
     const source = user?.name || user?.email || "?"
     return source.trim().charAt(0).toUpperCase()
   }
 
+  /**
+   * Handles logout by closing dropdown and calling auth logout function.
+   */
   const handleLogout = () => {
     setIsOpen(false)
     logout()

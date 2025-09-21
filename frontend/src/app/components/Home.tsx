@@ -6,62 +6,131 @@ import { toast } from "sonner";
 import { GRAPHQL_ENDPOINT } from "@/lib/backend";
 import { getRecentFileActivities, trackFileActivity, getFileURL } from "./api";
 
+/**
+ * Represents a recently accessed file with activity tracking information.
+ */
 interface RecentFile {
+  /** Unique identifier for the file activity record */
   id: string;
+  /** The file ID being tracked */
   fileId: string;
+  /** Type of activity performed on the file */
   activityType: string;
+  /** Most recent type of activity */
   lastActivityType: string;
+  /** Timestamp of the last activity */
   lastActivityAt: string;
+  /** Total number of activities on this file */
   activityCount: number;
+  /** File metadata information */
   file: {
+    /** Unique file identifier */
     id: string;
+    /** Original filename as uploaded */
     originalName: string;
+    /** MIME type of the file */
     mimeType: string;
+    /** File size in bytes */
     size: number;
+    /** File creation timestamp */
     createdAt: string;
   };
 }
 
+/**
+ * Response structure for GraphQL upload mutation.
+ */
 interface GraphQLUploadResponse {
+  /** Successful response data */
   data?: {
+    /** Array of uploaded file records */
     uploadFiles?: Array<{
+      /** Upload record ID */
       id: string;
+      /** User who uploaded the file */
       userId: string;
+      /** Associated file ID */
       fileId: string;
+      /** Upload timestamp */
       uploadedAt: string;
+      /** File metadata */
       file: {
+        /** Unique file identifier */
         id: string;
+        /** File content hash */
         hash: string;
+        /** Original filename */
         originalName: string;
+        /** MIME type */
         mimeType: string;
+        /** File size in bytes */
         size: number;
+        /** File visibility setting */
         visibility: string;
+        /** Creation timestamp */
         createdAt: string;
       };
     }>;
   };
+  /** Error information if upload failed */
   errors?: Array<{ message: string }>;
 }
 
+/**
+ * GraphQL operation structure for file uploads.
+ */
 interface UploadOperations {
+  /** GraphQL mutation query string */
   query: string;
+  /** Variables for the GraphQL mutation */
   variables: {
+    /** Input parameters for file upload */
     input: {
+      /** Array of files to upload (null placeholders for multipart) */
       files: (File | null)[];
+      /** Whether to allow duplicate file uploads */
       allowDuplicate?: boolean;
     };
   };
 }
 
+/**
+ * Represents an individual file upload item with progress tracking.
+ */
 type UploadItem = {
+  /** Unique identifier for this upload */
   id: string;
+  /** The file being uploaded */
   file: File;
+  /** Upload progress percentage (0-100) */
   progress: number;
+  /** Current upload status */
   status: "queued" | "uploading" | "done" | "error";
+  /** Error message if upload failed */
   error?: string;
+  /** Whether this item is being removed from the queue */
   removing?: boolean; 
 };
 
+/**
+ * Uploads a file to the GraphQL endpoint using multipart form data.
+ * 
+ * @param file - The file to upload
+ * @param token - Optional authentication token
+ * @param onProgress - Optional callback to track upload progress (percentage 0-100)
+ * @param allowDuplicate - Whether to allow duplicate file uploads
+ * @returns Promise that resolves to the GraphQL upload response
+ * 
+ * @example
+ * ```typescript
+ * const response = await graphqlUpload(
+ *   selectedFile, 
+ *   authToken, 
+ *   (progress) => console.log(`${progress}% complete`),
+ *   true
+ * );
+ * ```
+ */
 const graphqlUpload = (file: File, token?: string, onProgress?: (pct: number) => void, allowDuplicate?: boolean) => {
   return new Promise<GraphQLUploadResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -109,6 +178,23 @@ const graphqlUpload = (file: File, token?: string, onProgress?: (pct: number) =>
   });
 };
 
+/**
+ * Home component that provides file upload functionality with drag & drop support,
+ * progress tracking, and recent file activity display.
+ * 
+ * Features:
+ * - Drag and drop file upload
+ * - Multiple file upload with progress tracking
+ * - Duplicate file handling
+ * - Recent file activity display
+ * - File preview functionality
+ * 
+ * @component
+ * @example
+ * ```tsx
+ * <Home />
+ * ```
+ */
 export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploads, setUploads] = useState<UploadItem[]>([]);

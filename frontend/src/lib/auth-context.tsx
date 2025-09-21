@@ -3,25 +3,64 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
+/**
+ * User data structure for authenticated users.
+ */
 interface User {
+  /** Unique user identifier */
   id: string
+  /** User's email address */
   email: string
+  /** Display name (optional) */
   name?: string
+  /** Profile picture URL (optional) */
   picture?: string
+  /** Whether user authenticated via Google OAuth */
   isGoogle?: boolean
+  /** Whether user has admin privileges */
   isAdmin?: boolean
 }
 
+/**
+ * Authentication context value interface.
+ */
 interface AuthContextType {
+  /** Currently authenticated user or null if not authenticated */
   user: User | null
+  /** Authentication token or null if not authenticated */
   token: string | null
+  /** Function to log in a user with token and user data */
   login: (token: string, user: User) => void
+  /** Function to log out the current user */
   logout: () => void
+  /** Whether authentication state is still being determined */
   isLoading: boolean
 }
 
+/**
+ * React context for managing authentication state throughout the application.
+ */
 const AuthContext = createContext<AuthContextType | null>(null)
 
+/**
+ * Custom hook to access authentication context.
+ * 
+ * @throws Error if used outside of AuthProvider
+ * @returns Authentication context value
+ * 
+ * @example
+ * ```tsx
+ * const { user, token, login, logout, isLoading } = useAuth();
+ * 
+ * if (isLoading) return <Loader />;
+ * 
+ * if (!user) {
+ *   return <LoginForm onLogin={login} />;
+ * }
+ * 
+ * return <Dashboard user={user} onLogout={logout} />;
+ * ```
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -30,6 +69,42 @@ export const useAuth = () => {
   return context
 }
 
+/**
+ * Authentication provider component that manages auth state and route protection.
+ * 
+ * Features:
+ * - Persistent authentication via localStorage
+ * - Automatic route protection and redirection
+ * - Loading state management during auth checks
+ * - Route-based access control
+ * 
+ * Route Types:
+ * - Protected routes: Require authentication (/dashboard)
+ * - Auth routes: Only accessible when not authenticated (/login, /signup)
+ * - Public routes: Always accessible (/)
+ * 
+ * @component
+ * @param props - Component props
+ * @param props.children - Child components to render within the auth context
+ * 
+ * @example
+ * ```tsx
+ * // Wrap your app with AuthProvider
+ * function App() {
+ *   return (
+ *     <AuthProvider>
+ *       <Router>
+ *         <Routes>
+ *           <Route path="/" element={<Home />} />
+ *           <Route path="/login" element={<Login />} />
+ *           <Route path="/dashboard" element={<Dashboard />} />
+ *         </Routes>
+ *       </Router>
+ *     </AuthProvider>
+ *   );
+ * }
+ * ```
+ */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -38,8 +113,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const pathname = usePathname()
 
   // Define route types
+  /** Routes that require authentication */
   const protectedRoutes = ['/dashboard']
+  /** Routes only accessible when not authenticated */
   const authRoutes = ['/login', '/signup']
+  /** Routes accessible to everyone */
   const publicRoutes = ['/']
 
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
@@ -97,6 +175,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [isLoading, token, isProtectedRoute, isAuthRoute, router, pathname, user])
 
+  /**
+   * Authenticates a user by storing their token and data.
+   * 
+   * @param newToken - JWT authentication token
+   * @param newUser - User data to store
+   */
   const login = (newToken: string, newUser: User) => {
     localStorage.setItem('token', newToken)
     localStorage.setItem('user', JSON.stringify(newUser))
@@ -104,6 +188,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(newUser)
   }
 
+  /**
+   * Logs out the current user by clearing all stored data.
+   * Automatically redirects to the login page.
+   */
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')

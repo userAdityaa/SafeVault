@@ -1,25 +1,57 @@
+/**
+ * @fileoverview FileCard component for displaying individual files in a grid layout.
+ * This component shows file information and provides action buttons for file operations.
+ */
+
 import React from "react";
 import Image from "next/image";
 import { GqlUserFile } from "../types";
 import { Eye, Info, MoveRight, Download, Trash, Share, Star } from "lucide-react";
 
+/**
+ * Props for the FileCard component.
+ */
 interface Props {
+  /** User-file association data to display */
   uf: GqlUserFile;
+  /** Callback when user wants to preview the file */
   onPreview: (uf: GqlUserFile) => void;
+  /** Callback when user wants to view file details */
   onDetails: (uf: GqlUserFile) => void;
+  /** Callback when user wants to move the file */
   onMove: (uf: GqlUserFile) => void;
+  /** Callback when user wants to download the file */
   onDownload: (uf: GqlUserFile) => void;
+  /** Callback when user wants to delete the file */
   onDelete: (uf: GqlUserFile) => void;
+  /** Callback when user wants to share the file */
   onShare: (uf: GqlUserFile) => void;
+  /** Optional callback when user wants to star/unstar the file */
   onStar?: (uf: GqlUserFile) => void;
+  /** Whether the file is currently starred */
   isStarred?: boolean;
 }
 
-// helper to truncate filename by characters
+/**
+ * Helper function to truncate long text with ellipsis.
+ * Ensures file names don't overflow the card layout.
+ * 
+ * @param {string} text - Text to truncate
+ * @param {number} maxChars - Maximum characters before truncation
+ * @returns {string} Truncated text with ellipsis if needed
+ */
 const truncateText = (text: string, maxChars: number) => {
   return text.length > maxChars ? text.slice(0, maxChars) + "..." : text;
 };
 
+/**
+ * FileCard component displays a single file with its metadata and action buttons.
+ * Used in grid layouts to show user files with hover effects and interactive elements.
+ * Provides quick access to common file operations like preview, download, and sharing.
+ * 
+ * @param {Props} props - Component properties
+ * @returns {JSX.Element} Rendered file card component
+ */
 export const FileCard: React.FC<Props> = ({
   uf,
   onPreview,

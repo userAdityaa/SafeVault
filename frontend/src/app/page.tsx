@@ -1,3 +1,22 @@
+/**
+ * Landing page component for the SnapVault application.
+ * 
+ * Displays the main marketing page with:
+ * - Header with navigation and branding
+ * - Hero section with call-to-action
+ * - Features and benefits sections
+ * - Footer with company information
+ * 
+ * @component
+ * @returns JSX element representing the landing page
+ * 
+ * @example
+ * ```tsx
+ * // This component is automatically rendered at the root route "/"
+ * // Defined by Next.js app directory routing
+ * ```
+ */
+
 import Image from "next/image";
 import Link from "next/link";
 
