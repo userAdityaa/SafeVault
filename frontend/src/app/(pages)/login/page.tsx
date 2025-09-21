@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginSchema } from "@/schema/auth";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { GoogleLogin } from "@react-oauth/google";
 import Loader from "@/app/components/Loader";
 import { GRAPHQL_ENDPOINT } from "@/lib/backend";
@@ -188,7 +188,6 @@ export default function Login() {
 
   return (
     <div className="flex h-screen">
-      <Toaster richColors position="top-right" />
       {isLoading && (
         <div className="fixed inset-0 bg-white flex items-center justify-center z-1000">
           <Loader />

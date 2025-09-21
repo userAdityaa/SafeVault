@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signupSchema } from "@/schema/auth";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { GRAPHQL_ENDPOINT } from "@/lib/backend";
 import { useAuth } from "@/lib/auth-context";
 
@@ -121,8 +121,6 @@ export default function SignUp() {
 
   return (
     <div className="flex h-screen">
-      {/* Toaster component for notifications */}
-      <Toaster richColors position="top-right" />
       {/* Left Section with Sign-Up Form */}
       <div className="flex-1 p-12 flex flex-col justify-center items-center">
         <div className="text-center">
