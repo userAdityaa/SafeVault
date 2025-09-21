@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -148,6 +149,207 @@ func (r *mutationResolver) UploadFiles(ctx context.Context, input model.UploadFi
 	}
 
 	return gqlFiles, nil
+}
+
+// UploadFolder is the resolver for the uploadFolder field.
+func (r *mutationResolver) UploadFolder(ctx context.Context, input model.UploadFolderInput) (*model.UploadFolderResult, error) {
+	// Require authentication
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user id in token")
+	}
+
+	if len(input.Files) == 0 {
+		return nil, fmt.Errorf("no files provided")
+	}
+
+	if input.FolderName == "" {
+		return nil, fmt.Errorf("folder name required")
+	}
+
+	// Parse parent ID if provided
+	var parentID *uuid.UUID
+	if input.ParentID != nil {
+		pid, err := uuid.Parse(*input.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid parent folder ID")
+		}
+		parentID = &pid
+	}
+
+	// Create the root folder
+	rootFolderID, err := r.FolderService.CreateFolder(ctx, userID, input.FolderName, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create root folder: %w", err)
+	}
+
+	// Group files by their directory paths
+	folderMap := make(map[string]uuid.UUID)
+	folderMap[""] = rootFolderID // Root folder
+
+	var uploadedFiles []*model.UserFile
+	totalSize := int64(0)
+	createdFolders := 1 // Root folder
+
+	// Process each file
+	for _, fileInput := range input.Files {
+		if fileInput.File.File == nil {
+			continue
+		}
+
+		// Debug logging
+		fmt.Printf("DEBUG: Processing file with relativePath: %s\n", fileInput.RelativePath)
+
+		// Extract directory path from relative path
+		dir := ""
+		if fileInput.RelativePath != "" {
+			parts := strings.Split(fileInput.RelativePath, "/")
+			if len(parts) > 1 {
+				// Skip the first part if it matches the root folder name
+				dirParts := parts[:len(parts)-1]
+				if len(dirParts) > 0 && dirParts[0] == input.FolderName {
+					// Remove the root folder name from the path since we already created it
+					dirParts = dirParts[1:]
+				}
+				if len(dirParts) > 0 {
+					dir = strings.Join(dirParts, "/")
+				}
+			}
+		}
+
+		fmt.Printf("DEBUG: Extracted directory: '%s' from relativePath: '%s' (rootFolder: '%s')\n", dir, fileInput.RelativePath, input.FolderName)
+
+		// Create directory structure if needed
+		var targetFolderID uuid.UUID
+		if dir == "" {
+			targetFolderID = rootFolderID
+		} else {
+			if folderID, exists := folderMap[dir]; exists {
+				targetFolderID = folderID
+			} else {
+				// Create nested folder structure
+				pathParts := strings.Split(dir, "/")
+				currentPath := ""
+				currentParentID := &rootFolderID
+
+				for _, part := range pathParts {
+					if part == "" {
+						continue
+					}
+
+					if currentPath == "" {
+						currentPath = part
+					} else {
+						currentPath = currentPath + "/" + part
+					}
+
+					if folderID, exists := folderMap[currentPath]; exists {
+						currentParentID = &folderID
+					} else {
+						newFolderID, err := r.FolderService.CreateFolder(ctx, userID, part, currentParentID)
+						if err != nil {
+							return nil, fmt.Errorf("failed to create folder %s: %w", part, err)
+						}
+						folderMap[currentPath] = newFolderID
+						currentParentID = &newFolderID
+						createdFolders++
+					}
+				}
+				targetFolderID = *currentParentID
+			}
+		}
+
+		// Upload the file to the target folder
+		if r.FileService == nil {
+			return nil, fmt.Errorf("file storage not configured")
+		}
+
+		// Set allowDuplicate in context if specified
+		if input.AllowDuplicate != nil && *input.AllowDuplicate {
+			ctx = context.WithValue(ctx, "allowDuplicate", true)
+		}
+
+		// Set target folder in context for file upload
+		ctx = context.WithValue(ctx, "targetFolderID", targetFolderID)
+
+		// Debug logging
+		fmt.Printf("DEBUG: Setting targetFolderID in context: %s for file: %s\n", targetFolderID.String(), fileInput.RelativePath)
+
+		uploads := []*graphql.Upload{&fileInput.File}
+		userFiles, err := r.FileService.UploadFiles(ctx, userID, uploads)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload file %s: %w", fileInput.RelativePath, err)
+		}
+
+		// Convert to GraphQL model and track size
+		for _, uf := range userFiles {
+			var namePtr *string
+			if uf.UploaderName != "" {
+				n := uf.UploaderName
+				namePtr = &n
+			}
+			var picPtr *string
+			if uf.UploaderPicture != "" {
+				p := uf.UploaderPicture
+				picPtr = &p
+			}
+
+			gqlFile := &model.UserFile{
+				ID:         uf.ID.String(),
+				UserID:     uf.UserID.String(),
+				FileID:     uf.FileID.String(),
+				UploadedAt: uf.UploadedAt.Format(time.RFC3339),
+				File: &model.File{
+					ID:           uf.File.ID.String(),
+					Hash:         uf.File.Hash,
+					OriginalName: uf.File.OriginalName,
+					MimeType:     uf.File.MimeType,
+					Size:         int(uf.File.Size),
+					RefCount:     uf.File.RefCount,
+					Visibility:   uf.File.Visibility,
+					CreatedAt:    uf.File.CreatedAt.Format(time.RFC3339),
+				},
+				Uploader: &model.Uploader{
+					Email:   uf.UploaderEmail,
+					Name:    namePtr,
+					Picture: picPtr,
+				},
+			}
+			uploadedFiles = append(uploadedFiles, gqlFile)
+			totalSize += uf.File.Size
+		}
+	}
+
+	// Get the root folder info
+	rootFolder, err := r.FolderService.Repo.GetFolderByID(ctx, userID, rootFolderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get root folder: %w", err)
+	}
+
+	return &model.UploadFolderResult{
+		Folder: &model.Folder{
+			ID:   rootFolder.ID.String(),
+			Name: rootFolder.Name,
+			ParentID: func() *string {
+				if rootFolder.ParentID != nil {
+					s := rootFolder.ParentID.String()
+					return &s
+				}
+				return nil
+			}(),
+			CreatedAt: rootFolder.CreatedAt.Format(time.RFC3339),
+		},
+		Files: uploadedFiles,
+		Summary: &model.UploadSummary{
+			TotalFiles:   len(uploadedFiles),
+			TotalFolders: createdFolders,
+			TotalSize:    int(totalSize),
+		},
+	}, nil
 }
 
 // DeleteFile is the resolver for the deleteFile field.
@@ -296,6 +498,31 @@ func (r *mutationResolver) DeleteFolder(ctx context.Context, folderID string) (b
 		return false, fmt.Errorf("invalid folder id")
 	}
 	if err := r.FolderService.DeleteFolder(ctx, userID, fid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// DeleteFolderRecursive is the resolver for the deleteFolderRecursive field.
+func (r *mutationResolver) DeleteFolderRecursive(ctx context.Context, folderID string) (bool, error) {
+	// Require authentication
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return false, fmt.Errorf("unauthorized")
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return false, fmt.Errorf("invalid user id in token")
+	}
+
+	// Parse folder ID
+	fid, err := uuid.Parse(folderID)
+	if err != nil {
+		return false, fmt.Errorf("invalid folder id")
+	}
+
+	// Use the new recursive delete method from FolderService
+	if err := r.FolderService.DeleteFolderRecursive(ctx, userID, fid); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -1457,6 +1684,63 @@ func (r *queryResolver) SharedFolderFiles(ctx context.Context, folderID string) 
 	return result, nil
 }
 
+// SharedFolderSubfolders is the resolver for the sharedFolderSubfolders field.
+func (r *queryResolver) SharedFolderSubfolders(ctx context.Context, folderID string) ([]*model.Folder, error) {
+	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID")
+	}
+
+	folderUUID, err := uuid.Parse(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid folder ID")
+	}
+
+	// Get user email for access check
+	userEmail, err := r.ShareService.UserRepo.GetUserEmailByID(ctx, userID.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user email: %w", err)
+	}
+
+	// Check if user has access to the folder
+	hasAccess, _, err := r.ShareService.HasFolderAccess(ctx, userID, userEmail, folderUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check folder access: %w", err)
+	}
+	if !hasAccess {
+		return nil, fmt.Errorf("access denied to folder")
+	}
+
+	// Get subfolders within the shared folder
+	subfolders, err := r.ShareService.GetSharedFolderSubfolders(ctx, userID, folderUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subfolders: %w", err)
+	}
+
+	var result []*model.Folder
+	for _, folder := range subfolders {
+		result = append(result, &model.Folder{
+			ID:   folder.ID.String(),
+			Name: folder.Name,
+			ParentID: func() *string {
+				if folder.ParentID != nil {
+					s := folder.ParentID.String()
+					return &s
+				}
+				return nil
+			}(),
+			CreatedAt: folder.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return result, nil
+}
+
 // FileShares is the resolver for the fileShares field.
 func (r *queryResolver) FileShares(ctx context.Context, fileID string) ([]*model.FileShare, error) {
 	userIDStr, ok := middleware.GetUserIDFromContext(ctx)
@@ -1670,6 +1954,46 @@ func (r *queryResolver) PublicFolderFiles(ctx context.Context, token string) ([]
 				Name:    &file.UploaderName,
 				Picture: &file.UploaderPicture,
 			},
+		})
+	}
+
+	return result, nil
+}
+
+// PublicFolderSubfolders is the resolver for the publicFolderSubfolders field.
+func (r *queryResolver) PublicFolderSubfolders(ctx context.Context, token string) ([]*model.Folder, error) {
+	if r.PublicLinkService == nil {
+		return nil, fmt.Errorf("public link service not configured")
+	}
+
+	// First resolve the public folder link to get the folder
+	folder, _, _, revoked, err := r.PublicLinkService.ResolveFolderLink(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	if revoked || folder == nil {
+		return nil, fmt.Errorf("folder link not found or has been revoked")
+	}
+
+	// Get subfolders within the public folder
+	subfolders, err := r.FolderService.Repo.ListFolders(ctx, uuid.Nil, &folder.ID) // Don't filter by user since it's a public folder
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subfolders: %w", err)
+	}
+
+	var result []*model.Folder
+	for _, subfolder := range subfolders {
+		result = append(result, &model.Folder{
+			ID:   subfolder.ID.String(),
+			Name: subfolder.Name,
+			ParentID: func() *string {
+				if subfolder.ParentID != nil {
+					s := subfolder.ParentID.String()
+					return &s
+				}
+				return nil
+			}(),
+			CreatedAt: subfolder.CreatedAt.Format(time.RFC3339),
 		})
 	}
 

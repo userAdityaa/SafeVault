@@ -6,32 +6,54 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 )
 
+// Extended user information for administrative views
 type AdminUserInfo struct {
-	ID           string  `json:"id"`
-	Email        string  `json:"email"`
-	Name         *string `json:"name,omitempty"`
-	Picture      *string `json:"picture,omitempty"`
-	CreatedAt    string  `json:"createdAt"`
-	UpdatedAt    string  `json:"updatedAt"`
-	TotalFiles   int     `json:"totalFiles"`
-	TotalFolders int     `json:"totalFolders"`
-	StorageUsed  int     `json:"storageUsed"`
+	// Unique identifier for the user
+	ID string `json:"id"`
+	// User's email address
+	Email string `json:"email"`
+	// User's display name (optional)
+	Name *string `json:"name,omitempty"`
+	// URL to user's profile picture (optional)
+	Picture *string `json:"picture,omitempty"`
+	// ISO timestamp when account was created
+	CreatedAt string `json:"createdAt"`
+	// ISO timestamp when account was last updated
+	UpdatedAt string `json:"updatedAt"`
+	// Total number of files owned by user
+	TotalFiles int `json:"totalFiles"`
+	// Total number of folders owned by user
+	TotalFolders int `json:"totalFolders"`
+	// Total storage used by user in bytes
+	StorageUsed int `json:"storageUsed"`
 }
 
+// Authentication response containing JWT token and user information
 type AuthPayload struct {
+	// JWT token for subsequent authenticated requests
 	Token string `json:"token"`
-	User  *User  `json:"user"`
+	// User account information
+	User *User `json:"user"`
 }
 
+// Represents a file stored in the system with deduplication by hash
 type File struct {
-	ID           string `json:"id"`
-	Hash         string `json:"hash"`
+	// Unique identifier for the file
+	ID string `json:"id"`
+	// SHA-256 hash of file content for deduplication
+	Hash string `json:"hash"`
+	// Original filename when uploaded
 	OriginalName string `json:"originalName"`
-	MimeType     string `json:"mimeType"`
-	Size         int    `json:"size"`
-	RefCount     int    `json:"refCount"`
-	Visibility   string `json:"visibility"`
-	CreatedAt    string `json:"createdAt"`
+	// MIME type describing file content
+	MimeType string `json:"mimeType"`
+	// File size in bytes
+	Size int `json:"size"`
+	// Number of users referencing this file
+	RefCount int `json:"refCount"`
+	// Access level: private, public, or shared
+	Visibility string `json:"visibility"`
+	// ISO timestamp when file was created
+	CreatedAt string `json:"createdAt"`
 }
 
 type FileActivity struct {
@@ -102,6 +124,14 @@ type Folder struct {
 	CreatedAt string  `json:"createdAt"`
 }
 
+// File entry for folder upload with its relative path
+type FolderFileInput struct {
+	// The actual file content
+	File graphql.Upload `json:"file"`
+	// Relative path of the file within the folder structure
+	RelativePath string `json:"relativePath"`
+}
+
 type FolderShare struct {
 	ID              string  `json:"id"`
 	FolderID        string  `json:"folderId"`
@@ -116,15 +146,21 @@ type FolderShare struct {
 	SharedWithUser  *User   `json:"sharedWithUser,omitempty"`
 }
 
+// Input for Google OAuth authentication
 type GoogleLoginInput struct {
+	// Google ID token from OAuth flow
 	IDToken string `json:"idToken"`
 }
 
+// Input for user authentication
 type LoginInput struct {
-	Email    string `json:"email"`
+	// User's email address
+	Email string `json:"email"`
+	// User's password
 	Password string `json:"password"`
 }
 
+// Root mutation type containing all write operations
 type Mutation struct {
 }
 
@@ -172,6 +208,7 @@ type PublicFolderLinkResolved struct {
 	Revoked   bool    `json:"revoked"`
 }
 
+// Root query type containing all read operations
 type Query struct {
 }
 
@@ -220,8 +257,11 @@ type SharedFolderWithMe struct {
 	Owner           *User   `json:"owner"`
 }
 
+// Input for creating a new user account
 type SignupInput struct {
-	Email    string `json:"email"`
+	// User's email address (must be unique)
+	Email string `json:"email"`
+	// Plain text password (will be hashed before storage)
 	Password string `json:"password"`
 }
 
@@ -259,35 +299,86 @@ type StorageUsage struct {
 	SavingsPercent float64 `json:"savingsPercent"`
 }
 
+// Input for uploading one or more files
 type UploadFileInput struct {
-	Files          []*graphql.Upload `json:"files"`
-	AllowDuplicate *bool             `json:"allowDuplicate,omitempty"`
+	// Array of files to upload
+	Files []*graphql.Upload `json:"files"`
+	// Whether to allow duplicate uploads (bypass deduplication)
+	AllowDuplicate *bool `json:"allowDuplicate,omitempty"`
+}
+
+// Input for uploading a folder with its nested structure
+type UploadFolderInput struct {
+	// Array of files with their relative paths within the folder
+	Files []*FolderFileInput `json:"files"`
+	// Name of the root folder being uploaded
+	FolderName string `json:"folderName"`
+	// Parent folder ID where the folder should be created
+	ParentID *string `json:"parentId,omitempty"`
+	// Whether to allow duplicate uploads (bypass deduplication)
+	AllowDuplicate *bool `json:"allowDuplicate,omitempty"`
+}
+
+type UploadFolderResult struct {
+	// The created root folder
+	Folder *Folder `json:"folder"`
+	// Array of uploaded files within the folder structure
+	Files []*UserFile `json:"files"`
+	// Summary of upload statistics
+	Summary *UploadSummary `json:"summary"`
+}
+
+type UploadSummary struct {
+	// Total number of files uploaded
+	TotalFiles int `json:"totalFiles"`
+	// Total number of folders created
+	TotalFolders int `json:"totalFolders"`
+	// Total size in bytes of uploaded content
+	TotalSize int `json:"totalSize"`
 }
 
 // Represents the uploader of a file. Can originate from either users or google_users.
 type Uploader struct {
-	Email   string  `json:"email"`
-	Name    *string `json:"name,omitempty"`
+	// Email address of the uploader
+	Email string `json:"email"`
+	// Display name of the uploader (optional)
+	Name *string `json:"name,omitempty"`
+	// Profile picture URL of the uploader (optional)
 	Picture *string `json:"picture,omitempty"`
 }
 
+// Represents a user account in the system
 type User struct {
-	ID        string  `json:"id"`
-	Email     string  `json:"email"`
-	Name      *string `json:"name,omitempty"`
-	Picture   *string `json:"picture,omitempty"`
-	CreatedAt string  `json:"createdAt"`
-	UpdatedAt string  `json:"updatedAt"`
-	IsAdmin   bool    `json:"isAdmin"`
+	// Unique identifier for the user
+	ID string `json:"id"`
+	// User's email address
+	Email string `json:"email"`
+	// User's display name (optional)
+	Name *string `json:"name,omitempty"`
+	// URL to user's profile picture (optional)
+	Picture *string `json:"picture,omitempty"`
+	// ISO timestamp when account was created
+	CreatedAt string `json:"createdAt"`
+	// ISO timestamp when account was last updated
+	UpdatedAt string `json:"updatedAt"`
+	// Whether user has administrative privileges
+	IsAdmin bool `json:"isAdmin"`
 }
 
+// Association between a user and a file they have access to
 type UserFile struct {
-	ID         string    `json:"id"`
-	UserID     string    `json:"userId"`
-	FileID     string    `json:"fileId"`
-	UploadedAt string    `json:"uploadedAt"`
-	File       *File     `json:"file"`
-	Uploader   *Uploader `json:"uploader,omitempty"`
+	// Unique identifier for this user-file association
+	ID string `json:"id"`
+	// ID of the user who has access
+	UserID string `json:"userId"`
+	// ID of the file being accessed
+	FileID string `json:"fileId"`
+	// ISO timestamp when association was created
+	UploadedAt string `json:"uploadedAt"`
+	// The associated file data
+	File *File `json:"file"`
+	// Information about who originally uploaded the file
+	Uploader *Uploader `json:"uploader,omitempty"`
 }
 
 type UserFileConnection struct {

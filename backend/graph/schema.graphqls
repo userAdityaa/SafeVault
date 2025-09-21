@@ -73,6 +73,26 @@ input UploadFileInput {
   allowDuplicate: Boolean
 }
 
+"Input for uploading a folder with its nested structure"
+input UploadFolderInput {
+  "Array of files with their relative paths within the folder"
+  files: [FolderFileInput!]!
+  "Name of the root folder being uploaded"
+  folderName: String!
+  "Parent folder ID where the folder should be created"
+  parentId: ID
+  "Whether to allow duplicate uploads (bypass deduplication)"
+  allowDuplicate: Boolean
+}
+
+"File entry for folder upload with its relative path"
+input FolderFileInput {
+  "The actual file content"
+  file: Upload!
+  "Relative path of the file within the folder structure"
+  relativePath: String!
+}
+
 "Input for Google OAuth authentication"
 input GoogleLoginInput {
   "Google ID token from OAuth flow"
@@ -92,6 +112,8 @@ type Mutation {
   # File mutations
   "Upload one or more files to user's storage"
   uploadFiles(input: UploadFileInput!): [UserFile!]!
+  "Upload a folder with its files and nested structure"
+  uploadFolder(input: UploadFolderInput!): UploadFolderResult!
   "Soft delete a file (moves to trash)"
   deleteFile(fileId: ID!): Boolean!
   "Recover a soft-deleted file from trash"
@@ -106,6 +128,8 @@ type Mutation {
   renameFolder(folderId: ID!, newName: String!): Boolean!
   "Delete a folder and optionally its contents"
   deleteFolder(folderId: ID!): Boolean!
+  "Delete a folder and all its contents recursively"
+  deleteFolderRecursive(folderId: ID!): Boolean!
   "Move a file to a different folder"
   moveUserFile(mappingId: ID!, folderId: ID): Boolean!
 
@@ -234,6 +258,8 @@ type Query {
   sharedFoldersWithMe: [SharedFolderWithMe!]!
   "Get files within a shared folder"
   sharedFolderFiles(folderId: ID!): [UserFile!]!
+  "Get subfolders within a shared folder"
+  sharedFolderSubfolders(folderId: ID!): [Folder!]!
   "Get all users a specific file is shared with"
   fileShares(fileId: ID!): [FileShare!]!
   "Get all users a specific folder is shared with"
@@ -246,6 +272,8 @@ type Query {
   resolvePublicFolderLink(token: String!): PublicFolderLinkResolved
   "Get files within a publicly shared folder"
   publicFolderFiles(token: String!): [UserFile!]!
+  "Get subfolders within a publicly shared folder"
+  publicFolderSubfolders(token: String!): [Folder!]!
 
   # Admin queries (admin only)
   "Get information about all users (admin only)"
@@ -315,6 +343,24 @@ type Folder {
   name: String!
   parentId: ID
   createdAt: String!
+}
+
+type UploadFolderResult {
+  "The created root folder"
+  folder: Folder!
+  "Array of uploaded files within the folder structure"
+  files: [UserFile!]!
+  "Summary of upload statistics"
+  summary: UploadSummary!
+}
+
+type UploadSummary {
+  "Total number of files uploaded"
+  totalFiles: Int!
+  "Total number of folders created"
+  totalFolders: Int!
+  "Total size in bytes of uploaded content"
+  totalSize: Int!
 }
 
 # Sharing types
