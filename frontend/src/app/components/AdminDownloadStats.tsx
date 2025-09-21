@@ -46,8 +46,9 @@ export default function AdminDownloadStats() {
         QUERY_ADMIN_FILE_DOWNLOAD_STATS
       );
       setStats(data.adminFileDownloadStats);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to load download statistics');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load download statistics';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

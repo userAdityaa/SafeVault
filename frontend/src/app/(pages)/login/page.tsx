@@ -27,9 +27,12 @@ export default function Login() {
 
     const result = loginSchema.safeParse(form);
     if (!result.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
       result.error.issues.forEach((err) => {
-        fieldErrors[err.path[0]] = err.message;
+        const field = err.path[0];
+        if (typeof field === 'string') {
+          fieldErrors[field] = err.message;
+        }
         toast.error(err.message, { description: `Error in ${err.path} field` });
       });
       setErrors(fieldErrors);
@@ -112,7 +115,7 @@ export default function Login() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
     try {
       const idToken = credentialResponse.credential;
       if (!idToken) {
@@ -237,7 +240,7 @@ export default function Login() {
           </form>
 
           <p className="mt-4">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <a href="/signup" className="text-blue-500">
               Create one
             </a>

@@ -192,7 +192,7 @@ export const DeleteFolderModal: React.FC<{ open: boolean; folder?: GqlFolder | n
           <button className="text-gray-600 hover:text-gray-900 p-1" onClick={onCancel}>✕</button>
         </div>
         <div className="text-sm text-gray-700 leading-relaxed">
-          Are you sure you want to delete the folder <span className="font-medium break-words">"{folder.name}"</span>? Files inside will be moved to Root.
+          Are you sure you want to delete the folder <span className="font-medium break-words">&quot;{folder.name}&quot;</span>? Files inside will be moved to Root.
         </div>
         <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-end">
           <button className="px-3 sm:px-4 py-2 sm:mr-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm order-2 sm:order-1" onClick={onCancel} disabled={disabled}>Cancel</button>

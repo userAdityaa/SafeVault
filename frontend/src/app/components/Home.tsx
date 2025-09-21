@@ -6,6 +6,53 @@ import { toast } from "sonner";
 import { GRAPHQL_ENDPOINT } from "@/lib/backend";
 import { getRecentFileActivities, trackFileActivity, getFileURL } from "./api";
 
+interface RecentFile {
+  id: string;
+  fileId: string;
+  activityType: string;
+  lastActivityType: string;
+  lastActivityAt: string;
+  activityCount: number;
+  file: {
+    id: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    createdAt: string;
+  };
+}
+
+interface GraphQLUploadResponse {
+  data?: {
+    uploadFiles?: Array<{
+      id: string;
+      userId: string;
+      fileId: string;
+      uploadedAt: string;
+      file: {
+        id: string;
+        hash: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        visibility: string;
+        createdAt: string;
+      };
+    }>;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+interface UploadOperations {
+  query: string;
+  variables: {
+    input: {
+      files: (File | null)[];
+      allowDuplicate?: boolean;
+    };
+  };
+}
+
 type UploadItem = {
   id: string;
   file: File;
@@ -16,7 +63,7 @@ type UploadItem = {
 };
 
 const graphqlUpload = (file: File, token?: string, onProgress?: (pct: number) => void, allowDuplicate?: boolean) => {
-  return new Promise<{ data?: any; errors?: any }>((resolve, reject) => {
+  return new Promise<GraphQLUploadResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", GRAPHQL_ENDPOINT);
     xhr.setRequestHeader("Accept", "application/json");
@@ -44,7 +91,7 @@ const graphqlUpload = (file: File, token?: string, onProgress?: (pct: number) =>
 
     const mutation = `mutation UploadFiles($input: UploadFileInput!) {\n  uploadFiles(input: $input) {\n    id\n    userId\n    fileId\n    uploadedAt\n    file { id hash originalName mimeType size visibility createdAt }\n  }\n}`;
 
-      const operations: any = {
+      const operations: UploadOperations = {
         query: mutation,
         variables: { input: { files: [null] } },
       };
@@ -68,7 +115,7 @@ export default function Home() {
   const [dragOver, setDragOver] = useState(false);
   const [dupModal, setDupModal] = useState<{ open: boolean; current?: { item: UploadItem; matchName: string; hash: string } } | null>(null);
   const [newlyAdded, setNewlyAdded] = useState<Set<string>>(new Set());
-  const [recentFiles, setRecentFiles] = useState<any[]>([]);
+  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [recentFilesLoading, setRecentFilesLoading] = useState(false);
 
   // Load recent file activities
@@ -101,7 +148,7 @@ export default function Home() {
   }, [loadRecentFiles]);
 
   // Handle preview for recent files
-  const handleRecentFilePreview = useCallback(async (file: any) => {
+  const handleRecentFilePreview = useCallback(async (file: RecentFile['file']) => {
     try {
       await trackFileActivity(file.id, 'preview');
       const url = await getFileURL(file.id, true);
@@ -112,7 +159,7 @@ export default function Home() {
   }, []);
 
   // Handle download for recent files  
-  const handleRecentFileDownload = useCallback(async (file: any) => {
+  const handleRecentFileDownload = useCallback(async (file: RecentFile['file']) => {
     try {
       await trackFileActivity(file.id, 'download');
       const url = await getFileURL(file.id, false);
@@ -187,12 +234,13 @@ export default function Home() {
           // open modal and wait for user choice
           await new Promise<void>((resolve) => {
             setDupModal({ open: true, current: { item, matchName: match.file.originalName, hash } });
-            const handler = (e: any) => {
-              if (e.detail?.action === "continue" && e.detail?.hash === hash && e.detail?.id === item.id) {
+            const handler = (e: Event) => {
+              const customEvent = e as CustomEvent<{ action: string; hash: string; id: string }>;
+              if (customEvent.detail?.action === "continue" && customEvent.detail?.hash === hash && customEvent.detail?.id === item.id) {
                 window.removeEventListener("dup:response", handler);
                 allowDup = true;
                 resolve();
-              } else if (e.detail?.action === "skip" && e.detail?.hash === hash && e.detail?.id === item.id) {
+              } else if (customEvent.detail?.action === "skip" && customEvent.detail?.hash === hash && customEvent.detail?.id === item.id) {
                 window.removeEventListener("dup:response", handler);
                 // Mark skipped by showing toast and removing with animation
                 toast.info(`Skipped ${item.file.name}`);
@@ -205,8 +253,9 @@ export default function Home() {
           });
           setDupModal({ open: false });
         }
-      } catch (e: any) {
-        if (e?.message === "skip") continue;
+      } catch (e: unknown) {
+        const error = e as Error;
+        if (error?.message === "skip") continue;
       }
 
       setUploads((prev) => prev.map((u) => (u.id === item.id ? { ...u, status: "uploading", progress: 1 } : u)));

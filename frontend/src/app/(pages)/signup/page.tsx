@@ -27,9 +27,12 @@ export default function SignUp() {
     const result = signupSchema.safeParse(form);
 
     if (!result.success) {
-      const fieldErrors: any = {};
+      const fieldErrors: Record<string, string> = {};
       result.error.issues.forEach(err => {
-        fieldErrors[err.path[0]] = err.message;
+        const field = err.path[0];
+        if (typeof field === 'string') {
+          fieldErrors[field] = err.message;
+        }
         toast.error(err.message, { description: `Error in ${err.path} field` });
       });
       setErrors(fieldErrors);

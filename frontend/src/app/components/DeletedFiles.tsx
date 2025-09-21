@@ -48,8 +48,9 @@ export default function DeletedFiles() {
       const json = await res.json();
       if (json.errors) throw new Error(json.errors[0]?.message || "Failed to load deleted files");
       setFiles(json.data.myDeletedFiles || []);
-    } catch (e: any) {
-      setError(e.message || "Failed to load deleted files");
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to load deleted files";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -86,8 +87,9 @@ export default function DeletedFiles() {
       } else {
         throw new Error("Failed to purge file");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to purge file");
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to purge file";
+      toast.error(errorMessage);
     }
   };
 
@@ -115,8 +117,9 @@ export default function DeletedFiles() {
       } else {
         throw new Error("Failed to recover file");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to recover file");
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : "Failed to recover file";
+      toast.error(errorMessage);
     }
   };
 

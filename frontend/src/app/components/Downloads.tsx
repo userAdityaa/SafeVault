@@ -96,9 +96,10 @@ export default function Downloads({ fileId }: DownloadsProps) {
         console.log('Downloads data:', data);
         console.log('Downloads count:', downloads.length);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error fetching downloads:', error);
-      toast.error(error.message || 'Failed to load downloads');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load downloads';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -237,7 +238,7 @@ export default function Downloads({ fileId }: DownloadsProps) {
           {/* Header */}
           <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No downloads yet</h3>
           <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8">
-            When people download your shared files, you'll see detailed analytics here.
+            When people download your shared files, you&apos;ll see detailed analytics here.
           </p>
           
           {/* How-to Guide */}
@@ -257,7 +258,7 @@ export default function Downloads({ fileId }: DownloadsProps) {
                 <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-xs font-semibold text-blue-700">2</span>
                 </div>
-                <p>Recipients download the file from their "Shared with me" section</p>
+                <p>Recipients download the file from their &quot;Shared with me&quot; section</p>
               </div>
               <div className="flex items-start gap-3">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">

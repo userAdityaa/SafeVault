@@ -1,6 +1,37 @@
 import { QUERY_FILE_URL, MUTATION_CREATE_PUBLIC_FILE_LINK, MUTATION_REVOKE_PUBLIC_FILE_LINK, MUTATION_CREATE_PUBLIC_FOLDER_LINK, MUTATION_REVOKE_PUBLIC_FOLDER_LINK, QUERY_RESOLVE_PUBLIC_FILE_LINK, MUTATION_ADD_PUBLIC_FILE_TO_MY_STORAGE, MUTATION_TRACK_FILE_ACTIVITY, QUERY_MY_RECENT_FILE_ACTIVITIES } from './graphql';
 import { GRAPHQL_ENDPOINT } from '@/lib/backend';
 
+interface PublicLinkInfo {
+  token: string;
+  url: string;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+}
+
+interface ResolvedPublicFile {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+interface RecentFileActivity {
+  id: string;
+  fileId: string;
+  activityType: string;
+  lastActivityType: string;
+  lastActivityAt: string;
+  activityCount: number;
+  file: {
+    id: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    createdAt: string;
+  };
+}
+
 const ENDPOINT = GRAPHQL_ENDPOINT;
 
 export function getAuthToken() {
@@ -8,7 +39,7 @@ export function getAuthToken() {
   return localStorage.getItem('token') || undefined;
 }
 
-async function gqlFetch<TData = any>(query: string, variables?: Record<string, any>): Promise<TData> {
+async function gqlFetch<TData = unknown>(query: string, variables?: Record<string, unknown>): Promise<TData> {
   const token = getAuthToken();
   const res = await fetch(ENDPOINT, {
     method: 'POST',
@@ -33,7 +64,7 @@ export { gqlFetch };
 
 // Public link helpers
 export async function createPublicFileLink(fileId: string, expiresAt?: string) {
-  const data = await gqlFetch<{ createPublicFileLink: any }>(MUTATION_CREATE_PUBLIC_FILE_LINK, { fileId, expiresAt });
+  const data = await gqlFetch<{ createPublicFileLink: PublicLinkInfo }>(MUTATION_CREATE_PUBLIC_FILE_LINK, { fileId, expiresAt });
   return data.createPublicFileLink;
 }
 
@@ -43,7 +74,7 @@ export async function revokePublicFileLink(fileId: string) {
 }
 
 export async function createPublicFolderLink(folderId: string, expiresAt?: string) {
-  const data = await gqlFetch<{ createPublicFolderLink: any }>(MUTATION_CREATE_PUBLIC_FOLDER_LINK, { folderId, expiresAt });
+  const data = await gqlFetch<{ createPublicFolderLink: PublicLinkInfo }>(MUTATION_CREATE_PUBLIC_FOLDER_LINK, { folderId, expiresAt });
   return data.createPublicFolderLink;
 }
 
@@ -53,7 +84,7 @@ export async function revokePublicFolderLink(folderId: string) {
 }
 
 export async function resolvePublicFileLink(token: string) {
-  const data = await gqlFetch<{ resolvePublicFileLink: any }>(QUERY_RESOLVE_PUBLIC_FILE_LINK, { token });
+  const data = await gqlFetch<{ resolvePublicFileLink: ResolvedPublicFile }>(QUERY_RESOLVE_PUBLIC_FILE_LINK, { token });
   return data.resolvePublicFileLink;
 }
 
@@ -77,7 +108,7 @@ export async function trackFileActivity(fileId: string, activityType: 'preview' 
 
 export async function getRecentFileActivities(limit = 10) {
   console.log('Fetching recent file activities with limit:', limit);
-  const data = await gqlFetch<{ myRecentFileActivities: any[] }>(QUERY_MY_RECENT_FILE_ACTIVITIES, { limit });
+  const data = await gqlFetch<{ myRecentFileActivities: RecentFileActivity[] }>(QUERY_MY_RECENT_FILE_ACTIVITIES, { limit });
   console.log('Recent file activities response:', data);
   return data.myRecentFileActivities;
 }

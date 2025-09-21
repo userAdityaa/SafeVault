@@ -8,6 +8,11 @@ import { PreviewModal } from "./my-files/modals";
 import { gqlFetch } from "./api";
 import { QUERY_FILE_URL, QUERY_SHARED_FOLDER_FILES } from "./graphql";
 
+interface SharedContentResponse {
+  sharedFilesWithMe: SharedFile[];
+  sharedFoldersWithMe: SharedFolder[];
+}
+
 type GqlUserFile = {
   id: string;
   userId: string;
@@ -104,11 +109,12 @@ export default function SharedFiles() {
     setLoading(true);
     setError(null);
     try {
-      const data = await gqlFetch<{ sharedFilesWithMe: any[]; sharedFoldersWithMe: any[] }>(QUERY_SHARED_CONTENT);
+      const data = await gqlFetch<SharedContentResponse>(QUERY_SHARED_CONTENT);
       setSharedFiles(data.sharedFilesWithMe || []);
       setSharedFolders(data.sharedFoldersWithMe || []);
-    } catch (e: any) {
-      const msg = e.message || "Failed to fetch shared content";
+    } catch (e: unknown) {
+      const error = e as Error;
+      const msg = error.message || "Failed to fetch shared content";
       // Normalize common auth/network messages for user clarity
       const userMsg = /unauthorized|401/i.test(msg)
         ? "You are not authorized. Please log in again."
@@ -131,8 +137,9 @@ export default function SharedFiles() {
     try {
       const data = await gqlFetch<{ sharedFolderFiles: GqlUserFile[] }>(QUERY_SHARED_FOLDER_FILES, { folderId });
       setFolderFiles(data.sharedFolderFiles || []);
-    } catch (e: any) {
-      const msg = e.message || "Failed to fetch folder files";
+    } catch (e: unknown) {
+      const error = e as Error;
+      const msg = error.message || "Failed to fetch folder files";
       toast.error(msg);
       setFolderFiles([]);
     } finally {
@@ -172,8 +179,9 @@ export default function SharedFiles() {
     try {
       const url = await getFileURL(file.fileId, false);
       window.location.href = url;
-    } catch (error: any) {
-      toast.error(error.message || "Download failed");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Download failed");
     }
   };
 
@@ -192,8 +200,9 @@ export default function SharedFiles() {
     try {
       const url = await getFileURL(file.fileId, false);
       window.location.href = url;
-    } catch (error: any) {
-      toast.error(error.message || "Download failed");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Download failed");
     }
   };
 

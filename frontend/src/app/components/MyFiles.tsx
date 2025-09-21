@@ -41,7 +41,7 @@ export default function MyFiles() {
   const [shareModal, setShareModal] = useState<{ open: boolean; itemType?: "file" | "folder"; itemId?: string; itemName?: string }>({ open: false });
 
   const buildFilter = () => {
-    const f: any = {};
+    const f: Record<string, unknown> = {};
     if (search.filename.trim()) f.filename = search.filename.trim();
     const mimes = search.mimeTypes.split(",").map(s => s.trim()).filter(Boolean);
     if (mimes.length) f.mimeTypes = mimes;
@@ -77,15 +77,16 @@ export default function MyFiles() {
     }
     setError(null);
     try {
-      const variables: any = { filter: buildFilter(), pagination: { limit: 30, cursor: reset ? null : cursor } };
-      const data = await gqlFetch<any>(QUERY_SEARCH_MY_FILES, variables);
+      const variables: { filter: Record<string, unknown>; pagination: { limit: number; cursor: string | null } } = { filter: buildFilter(), pagination: { limit: 30, cursor: reset ? null : cursor } };
+      const data = await gqlFetch<{ searchMyFiles: { edges: Array<{ node: GqlUserFile }>; pageInfo: { endCursor?: string; hasNextPage?: boolean } } }>(QUERY_SEARCH_MY_FILES, variables);
       const conn = data.searchMyFiles;
-      const nodes: GqlUserFile[] = (conn.edges || []).map((e: any) => e.node);
+      const nodes: GqlUserFile[] = (conn.edges || []).map((e: { node: GqlUserFile }) => e.node);
       setFiles(prev => reset ? nodes : [...prev, ...nodes]);
       setCursor(conn.pageInfo?.endCursor || null);
       setHasNextPage(Boolean(conn.pageInfo?.hasNextPage));
-    } catch (e: any) {
-      setError(e.message || "Failed to load files");
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to load files");
     } finally {
       reset ? setLoading(false) : setLoadingMore(false);
     }
@@ -94,10 +95,11 @@ export default function MyFiles() {
   const fetchFolders = async (parentId: string | null) => {
     setFoldersLoading(true);
     try {
-      const data = await gqlFetch<any>(QUERY_MY_FOLDERS, { parentId });
+      const data = await gqlFetch<{ myFolders: GqlFolder[] }>(QUERY_MY_FOLDERS, { parentId });
       setFolders(data.myFolders || []);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to load folders");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to load folders");
       setFolders([]);
     } finally {
       setFoldersLoading(false);
@@ -108,12 +110,13 @@ export default function MyFiles() {
     setLoading(true);
     setError(null);
     try {
-      const data = await gqlFetch<any>(QUERY_MY_FOLDER_FILES, { folderId });
+      const data = await gqlFetch<{ myFolderFiles: GqlUserFile[] }>(QUERY_MY_FOLDER_FILES, { folderId });
       setFiles(data.myFolderFiles || []);
       setCursor(null);
       setHasNextPage(false);
-    } catch (e: any) {
-      setError(e.message || "Failed to load files");
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || "Failed to load files");
     } finally {
       setLoading(false);
     }
@@ -126,8 +129,9 @@ export default function MyFiles() {
       await gqlFetch(MUTATION_CREATE_FOLDER, { name, parentId: currentFolderId });
       toast.success("Folder created");
       fetchFolders(currentFolderId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to create folder");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to create folder");
     } finally {
       setFolderCruding(false);
     }
@@ -137,15 +141,16 @@ export default function MyFiles() {
     if (!newName || newName === folder.name) return;
     setFolderCruding(true);
     try {
-      const data = await gqlFetch(MUTATION_RENAME_FOLDER, { folderId: folder.id, newName });
+      const data = await gqlFetch<{ renameFolder: boolean }>(MUTATION_RENAME_FOLDER, { folderId: folder.id, newName });
       if (!data?.renameFolder) throw new Error("Failed to rename folder");
       toast.success("Folder renamed");
       if (currentFolderId === folder.id) setCurrentFolderName(newName);
       // Update path entry
       setFolderPath(prev => prev.map(p => p.id === folder.id ? { ...p, name: newName } : p));
       fetchFolders(currentFolderId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to rename folder");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to rename folder");
     } finally {
       setFolderCruding(false);
     }
@@ -154,7 +159,7 @@ export default function MyFiles() {
   const deleteFolder = async (folder: GqlFolder) => {
     setFolderCruding(true);
     try {
-      const data = await gqlFetch(MUTATION_DELETE_FOLDER, { folderId: folder.id });
+      const data = await gqlFetch<{ deleteFolder: boolean }>(MUTATION_DELETE_FOLDER, { folderId: folder.id });
       if (!data?.deleteFolder) throw new Error("Failed to delete folder");
       toast.success("Folder deleted");
       if (currentFolderId === folder.id) {
@@ -174,8 +179,9 @@ export default function MyFiles() {
           fetchFolderFiles(currentFolderId);
         }
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to delete folder");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to delete folder");
     } finally {
       setFolderCruding(false);
     }
@@ -183,25 +189,26 @@ export default function MyFiles() {
 
   const moveMappingToFolder = async (mappingId: string, folderId: string | null) => {
     try {
-      const data = await gqlFetch(MUTATION_MOVE_USER_FILE, { mappingId, folderId });
+      const data = await gqlFetch<{ moveUserFile: boolean }>(MUTATION_MOVE_USER_FILE, { mappingId, folderId });
       if (!data?.moveUserFile) throw new Error("Failed to move file");
       toast.success("Moved");
       if (isSearchActive()) searchFiles(true); else fetchFolderFiles(currentFolderId);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to move file");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to move file");
     }
   };
 
   // Starred functions
   const loadStarredItems = async () => {
     try {
-      const data = await gqlFetch(QUERY_MY_STARRED_ITEMS, {});
+      const data = await gqlFetch<{ myStarredItems: Array<{ itemId: string }> }>(QUERY_MY_STARRED_ITEMS, {});
       const starred = new Set<string>();
-      data.myStarredItems?.forEach((item: any) => {
+      data.myStarredItems?.forEach((item: { itemId: string }) => {
         starred.add(item.itemId);
       });
       setStarredItems(starred);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Failed to load starred items:", e);
     }
   };
@@ -224,8 +231,9 @@ export default function MyFiles() {
         setStarredItems(prev => new Set(prev).add(fileId));
         toast.success("File starred");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to update star status");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to update star status");
     }
   };
 
@@ -247,8 +255,9 @@ export default function MyFiles() {
         setStarredItems(prev => new Set(prev).add(folderId));
         toast.success("Folder starred");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to update star status");
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || "Failed to update star status");
     }
   };
 
@@ -354,7 +363,7 @@ export default function MyFiles() {
                 const url = await getFileURL(uf.fileId, false); 
                 window.location.href = url; 
               }}
-              onDelete={async (uf)=>{ try { const data = await gqlFetch(MUTATION_DELETE_FILE, { fileId: uf.fileId }); if (data?.deleteFile) { toast.success("Moved to Recently Deleted"); if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("files:updated")); if (isSearchActive()) searchFiles(true); else fetchFolderFiles(currentFolderId); } } catch (e: any) { toast.error(e.message || "Delete failed"); } }}
+              onDelete={async (uf)=>{ try { const data = await gqlFetch<{ deleteFile: boolean }>(MUTATION_DELETE_FILE, { fileId: uf.fileId }); if (data?.deleteFile) { toast.success("Moved to Recently Deleted"); if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("files:updated")); if (isSearchActive()) searchFiles(true); else fetchFolderFiles(currentFolderId); } } catch (e: unknown) { const error = e as Error; toast.error(error.message || "Delete failed"); } }}
               onShare={(uf)=> setShareModal({ open: true, itemType: "file", itemId: uf.fileId, itemName: uf.file.originalName })}
               onStar={handleStarFile}
               getIsStarred={(fileId) => starredItems.has(fileId)}

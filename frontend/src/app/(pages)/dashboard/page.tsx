@@ -206,7 +206,7 @@ export default function Dashboard() {
                       <div className="font-medium">{user?.name || user?.email}</div>
                       <div className="text-gray-500">
                         {(user?.email)?.slice(0, 20)}
-                        {(user?.email)!.length > 20 ? "…" : ""}
+                        {(user?.email && user.email.length > 20) ? "…" : ""}
                       </div>
                     </div>
                     <button
@@ -237,7 +237,7 @@ function bytesToMB(n: number) {
   return (n / (1024 * 1024)).toFixed(2);
 }
 
-async function fetchUsage(setUsage: (u: any) => void) {
+async function fetchUsage(setUsage: (u: { usedBytes: number; quotaBytes: number; percentUsed: number; savingsBytes?: number; savingsPercent?: number } | null) => void) {
   try {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") || undefined : undefined;
     const query = `query MyStorage { myStorage { usedBytes quotaBytes percentUsed savingsBytes savingsPercent } }`;

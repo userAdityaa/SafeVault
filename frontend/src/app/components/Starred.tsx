@@ -27,8 +27,8 @@ export default function Starred() {
     setError(null);
     
     try {
-      const filesResponse = await gqlFetch(QUERY_MY_STARRED_FILES, {});
-      const foldersResponse = await gqlFetch(QUERY_MY_STARRED_FOLDERS, {});
+      const filesResponse = await gqlFetch<{ myStarredFiles: GqlStarredFile[] }>(QUERY_MY_STARRED_FILES, {});
+      const foldersResponse = await gqlFetch<{ myStarredFolders: GqlStarredFolder[] }>(QUERY_MY_STARRED_FOLDERS, {});
 
       // Fix: gqlFetch returns json.data directly, not the whole response
       const files = filesResponse.myStarredFiles || [];
@@ -36,9 +36,10 @@ export default function Starred() {
 
       setStarredFiles(files);
       setStarredFolders(folders);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error("Error loading starred items:", err);
-      setError(err.message || "Failed to load starred items");
+      setError(error.message || "Failed to load starred items");
       toast.error("Failed to load starred items");
     } finally {
       setLoading(false);
@@ -47,7 +48,7 @@ export default function Starred() {
 
   const handleUnstarFile = async (fileId: string) => {
     try {
-      const response = await gqlFetch(MUTATION_UNSTAR_FILE, { fileId });
+      const response = await gqlFetch<{ unstarFile: { success: boolean }; errors?: Array<{ message: string }> }>(MUTATION_UNSTAR_FILE, { fileId });
       if (response.errors) {
         throw new Error(response.errors[0].message);
       }
@@ -55,15 +56,16 @@ export default function Starred() {
       // Remove from local state
       setStarredFiles(prev => prev.filter(sf => sf.file.id !== fileId));
       toast.success("File unstarred");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error("Error unstarring file:", err);
-      toast.error(err.message || "Failed to unstar file");
+      toast.error(error.message || "Failed to unstar file");
     }
   };
 
   const handleUnstarFolder = async (folderId: string) => {
     try {
-      const response = await gqlFetch(MUTATION_UNSTAR_FOLDER, { folderId });
+      const response = await gqlFetch<{ unstarFolder: { success: boolean }; errors?: Array<{ message: string }> }>(MUTATION_UNSTAR_FOLDER, { folderId });
       if (response.errors) {
         throw new Error(response.errors[0].message);
       }
@@ -71,9 +73,10 @@ export default function Starred() {
       // Remove from local state
       setStarredFolders(prev => prev.filter(sf => sf.folder.id !== folderId));
       toast.success("Folder unstarred");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error("Error unstarring folder:", err);
-      toast.error(err.message || "Failed to unstar folder");
+      toast.error(error.message || "Failed to unstar folder");
     }
   };
 
@@ -82,7 +85,8 @@ export default function Starred() {
       const url = await getFileURL(file.id, true);
       setPreview({ open: true, url, name: file.originalName, mime: file.mimeType });
       trackFileActivity(file.id, 'preview');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error("Error getting file URL:", err);
       toast.error("Failed to preview file");
     }
@@ -99,7 +103,8 @@ export default function Starred() {
       document.body.removeChild(a);
       trackFileActivity(file.id, 'download');
       toast.success("Download started");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as Error;
       console.error("Error downloading file:", err);
       toast.error("Failed to download file");
     }

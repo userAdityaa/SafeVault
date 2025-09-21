@@ -3,6 +3,35 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { gqlFetch } from "./api";
+
+interface ShareData {
+  id: string;
+  sharedWithEmail: string;
+  permission: string;
+  sharedAt: string;
+  expiresAt?: string | null;
+}
+
+interface ShareResponse {
+  fileShares?: ShareData[];
+  folderShares?: ShareData[];
+}
+
+interface PublicLinkResponse {
+  createPublicFileLink?: {
+    token: string;
+    url: string;
+    expiresAt?: string | null;
+    revokedAt?: string | null;
+  };
+  createPublicFolderLink?: {
+    token: string;
+    url: string;
+    expiresAt?: string | null;
+    revokedAt?: string | null;
+  };
+}
+
 import { 
   MUTATION_CREATE_PUBLIC_FILE_LINK,
   MUTATION_REVOKE_PUBLIC_FILE_LINK,
@@ -36,7 +65,7 @@ export default function ShareModal({
 }: ShareModalProps) {
   const [shareInput, setShareInput] = useState<ShareInput>({ emails: "", permission: "viewer" });
   const [isLoading, setIsLoading] = useState(false);
-  const [existingShares, setExistingShares] = useState<any[]>([]);
+  const [existingShares, setExistingShares] = useState<ShareData[]>([]);
   const [showExistingShares, setShowExistingShares] = useState(false);
   // Public link state
   const [publicLink, setPublicLink] = useState<{
@@ -104,8 +133,9 @@ export default function ShareModal({
       setShareInput({ emails: "", permission: "viewer" });
       onShareSuccess?.();
       onClose();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to share");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Failed to share");
     } finally {
       setIsLoading(false);
     }
@@ -122,12 +152,13 @@ export default function ShareModal({
         ? `query FileShares($fileId: ID!) { fileShares(fileId: $fileId) { id sharedWithEmail permission sharedAt expiresAt } }`
         : `query FolderShares($folderId: ID!) { folderShares(folderId: $folderId) { id sharedWithEmail permission sharedAt expiresAt } }`;
 
-      const data = await gqlFetch<any>(query, { [itemType === "file" ? "fileId" : "folderId"]: itemId });
+      const data = await gqlFetch<ShareResponse>(query, { [itemType === "file" ? "fileId" : "folderId"]: itemId });
       const shares = data[itemType === "file" ? "fileShares" : "folderShares"] || [];
       setExistingShares(shares);
       setShowExistingShares(true);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load existing shares");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Failed to load existing shares");
     }
   };
 
@@ -141,8 +172,9 @@ export default function ShareModal({
       toast.success(`Unshared with ${sharedWithEmail}`);
       setShowExistingShares(false);
       loadExistingShares();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to unshare");
+    } catch (error: unknown) {
+      const err = error as Error;
+      toast.error(err.message || "Failed to unshare");
     }
   };
 
@@ -300,8 +332,9 @@ export default function ShareModal({
                       await gqlFetch(mutation, { [itemType === 'file' ? 'fileId' : 'folderId']: itemId });
                       setPublicLink(null); // treat as removed
                       toast.success('Public link revoked');
-                    } catch (e: any) {
-                      toast.error(e.message || 'Failed to revoke link');
+                    } catch (e: unknown) {
+                      const error = e as Error;
+                      toast.error(error.message || 'Failed to revoke link');
                     } finally { setRevokingLink(false); }
                   }}
                   className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
@@ -326,20 +359,25 @@ export default function ShareModal({
                     try {
                       setCreatingLink(true);
                       const mutation = itemType === 'file' ? MUTATION_CREATE_PUBLIC_FILE_LINK : MUTATION_CREATE_PUBLIC_FOLDER_LINK;
-                      const vars: any = { [itemType === 'file' ? 'fileId' : 'folderId']: itemId };
+                      const vars: Record<string, unknown> = { [itemType === 'file' ? 'fileId' : 'folderId']: itemId };
                       if (plExpiresAt) vars.expiresAt = new Date(plExpiresAt).toISOString();
-                      const data = await gqlFetch(mutation, vars);
+                      const data = await gqlFetch<PublicLinkResponse>(mutation, vars);
                       const key = itemType === 'file' ? 'createPublicFileLink' : 'createPublicFolderLink';
                       const created = data[key];
-                      setPublicLink({
-                        token: created.token,
-                        url: created.url.startsWith('/') ? created.url : `/${created.url}`,
-                        expiresAt: created.expiresAt,
-                        revokedAt: created.revokedAt,
-                      });
-                      toast.success('Public link created');
-                    } catch (e: any) {
-                      toast.error(e.message || 'Failed to create public link');
+                      if (created) {
+                        setPublicLink({
+                          token: created.token,
+                          url: created.url.startsWith('/') ? created.url : `/${created.url}`,
+                          expiresAt: created.expiresAt,
+                          revokedAt: created.revokedAt,
+                        });
+                        toast.success('Public link created');
+                      } else {
+                        toast.error('Failed to create public link');
+                      }
+                    } catch (e: unknown) {
+                      const error = e as Error;
+                      toast.error(error.message || 'Failed to create public link');
                     } finally { setCreatingLink(false); }
                   }}
                   className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"

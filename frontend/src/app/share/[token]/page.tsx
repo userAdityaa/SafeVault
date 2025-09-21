@@ -106,8 +106,9 @@ export default function PublicSharePage() {
       }
 
       setError('Link not found or has been revoked');
-    } catch (e: any) {
-      setError(e.message || 'Failed to resolve link');
+    } catch (e: unknown) {
+      const error = e as Error;
+      setError(error.message || 'Failed to resolve link');
     } finally {
       setLoading(false);
     }
@@ -129,8 +130,9 @@ export default function PublicSharePage() {
     try {
       await gqlFetch(MUTATION_ADD_PUBLIC_FILE_TO_MY_STORAGE, { token });
       toast.success('Added to your storage');
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to add');
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || 'Failed to add');
     } finally { setAdding(false); }
   };
 
@@ -141,8 +143,9 @@ export default function PublicSharePage() {
       // For now rely on authenticated fileURL (if user has added or is owner / shared). Public direct download not implemented.
       const fileUrlData = await gqlFetch<{ fileURL: string }>(QUERY_FILE_URL, { fileId: fileData.file.id, inline });
       window.open(fileUrlData.fileURL, '_blank');
-    } catch (e: any) {
-      toast.error(e.message || 'Download failed');
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || 'Download failed');
     } finally { setDownloading(false); }
   };
 
@@ -161,8 +164,9 @@ export default function PublicSharePage() {
         a.click();
         document.body.removeChild(a);
       }
-    } catch (e: any) {
-      toast.error(e.message || 'Download failed');
+    } catch (e: unknown) {
+      const error = e as Error;
+      toast.error(error.message || 'Download failed');
     } finally { 
       setDownloadingFileId(null);
     }
