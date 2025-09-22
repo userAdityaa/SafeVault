@@ -37,6 +37,11 @@ func (s *AuthService) Signup(ctx context.Context, email, password string) (*mode
 		return nil, "", errors.New("user already exists")
 	}
 
+	existingGoogleUser, _ := s.UserRepo.FindByGoogleMail(ctx, email)
+	if existingGoogleUser != nil {
+		return nil, "", errors.New("you have already signed in with this email via Google. Please log in with Google")
+	}
+
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		return nil, "", err
