@@ -6,27 +6,17 @@
 
 SafeVault is a modern, enterprise-grade file storage and sharing platform built with Go, GraphQL, Next.js, and TypeScript. It provides secure file storage, intelligent deduplication, real-time collaboration, and comprehensive sharing capabilities with public links.
 
-## Quick Start with Docker
+**Live Demo**: [SafeVault](https://safevault-3w6o.onrender.com)
 
-Get SafeVault running locally in under 2 minutes:
+> **Note:** The `main` branch has **no rate limit** enabled for smooth testing of the application.
+
+For the version with rate limiting, clone and checkout the `rate-limiter` branch:
 
 ```bash
-# Clone the repository
 git clone git@github.com:BalkanID-University/vit-2026-capstone-internship-hiring-task-userAdityaa.git
 cd vit-2026-capstone-internship-hiring-task-userAdityaa
-
-# Start all services with one command
-docker compose up -d
+git checkout rate-limiter
 ```
-
-**Access your SafeVault instance:**
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8080
-- **MinIO Console**: http://localhost:9001
-- **Database**: localhost:5432
-
-That's it! SafeVault is now running with all services containerized and ready for development or testing.
 
 ## Docker Services
 
@@ -78,7 +68,7 @@ docker compose down -v
 
 - **Language**: Go 1.24+
 - **API**: GraphQL with gqlgen
-- **Database**: PostgreSQL 15+ with GORM
+- **Database**: PostgreSQL 17
 - **Storage**: MinIO (S3-compatible object storage)
 - **Authentication**: JWT tokens + Google OAuth 2.0
 - **Containerization**: Docker multi-stage builds
@@ -99,116 +89,18 @@ docker compose down -v
 - **Object Storage**: MinIO with admin console
 - **Networking**: Dedicated Docker network
 
-## Prerequisites
-
-### For Docker Setup (Recommended)
-
-- **Docker Desktop** - [Download](https://www.docker.com/products/docker-desktop)
-- **Docker Compose** (included with Docker Desktop)
-- **Git** for cloning the repository
-
-### For Manual Setup
-
-- **Go 1.24+** - [Download](https://golang.org/dl/)
-- **Node.js 18+** - [Download](https://nodejs.org/)
-- **PostgreSQL 15+** - [Download](https://www.postgresql.org/download/)
-- **MinIO** - [Download](https://min.io/download)
-
-## Development Setup
-
-### Docker (Recommended)
-
-```bash
-# Clone and start all services
-git clone https://github.com/userAdityaa/SnapVault.git
-cd SafeVault
-docker compose up -d
-
-# Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8080
-# MinIO Console: http://localhost:9001
-```
-
-### Manual Setup
+## Manual Setup
 
 For detailed backend and frontend setup instructions, see:
 
 - [Backend Setup](./backend/README.md)
 - [Frontend Setup](./frontend/README.md)
 
-## Production Deployment
-
-### Docker Production
-
-```bash
-# Clone repository
-git clone https://github.com/userAdityaa/SnapVault.git
-cd SafeVault
-
-# Configure production environment
-cp .env.production .env
-# Edit .env with production values
-
-# Deploy with Docker Compose
-docker compose up -d --build
-```
-
-### Cloud Options
+## Cloud Options
 
 - **AWS**: ECS with RDS and S3
 - **Google Cloud**: Cloud Run with Cloud SQL and Cloud Storage
 - **DigitalOcean**: App Platform with Managed Database
-
-## API Documentation
-
-## Production Deployment
-
-### Docker Production Setup
-
-1. **Production Docker Compose**
-
-   ```bash
-   # Use production configuration
-   docker compose -f docker-compose.prod.yml up -d
-   ```
-
-2. **Environment Configuration**
-
-   ```bash
-   # Set production environment variables
-   cp .env.production .env
-   # Edit with production credentials
-   ```
-
-3. **SSL & Reverse Proxy**
-
-   ```nginx
-   # nginx configuration example
-   server {
-       listen 80;
-       server_name your-domain.com;
-
-       location / {
-           proxy_pass http://localhost:3000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-       }
-
-       location /graphql {
-           proxy_pass http://localhost:8080;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-       }
-   }
-   ```
-
-### Cloud Deployment Options
-
-- **AWS**: ECS with RDS and S3
-- **Google Cloud**: Cloud Run with Cloud SQL and Cloud Storage
-- **DigitalOcean**: App Platform with Managed Database
-- **Self-hosted**: VPS with Docker Compose
 
 ## API Documentation
 
@@ -220,8 +112,9 @@ SafeVault provides a GraphQL API with comprehensive file management operations.
 
 For detailed API documentation, examples, and schema reference, see:
 
-- [Complete API Documentation](./docs/README.md)
-- [OpenAPI Specification](./docs/openapi.yaml)
+- [Database Schema](./docs/database-schema.md)
+- [API Schema](./docs/api-schema.md)
+- [Architecture Overview](./docs/architecture.md)
 
 ## Configuration
 
@@ -241,8 +134,6 @@ For complete environment variable reference, see:
 
 SafeVault supports S3-compatible storage: MinIO, AWS S3, Google Cloud Storage, DigitalOcean Spaces
 
-## Contributing
-
 ### Storage Configuration
 
 SafeVault supports any S3-compatible storage backend:
@@ -253,89 +144,6 @@ SafeVault supports any S3-compatible storage backend:
 - **DigitalOcean Spaces**
 - **Backblaze B2**
 - **Wasabi Hot Storage**
-
-## Deployment
-
-### Docker Production Deployment
-
-1. **Production Docker setup**
-
-   ```bash
-   ## Contributing
-   ```
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes and commit: `git commit -am 'Add feature'`
-4. Push to branch: `git push origin feature-name`
-5. Submit a pull request
-
-### Development Guidelines
-
-- Follow Go and TypeScript/React conventions
-- Write tests for new features
-- Update documentation for changes
-- Use conventional commit format
-
-## Support & Community
-
-- **Documentation**: [API Documentation](./docs/)
-- **Issues**: [GitHub Issues](https://github.com/userAdityaa/SafeVault/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/userAdityaa/SafeVault/discussions)
-
-## Acknowledgments ```
-
-2. **Reverse Proxy Configuration** (nginx example)
-
-   ```nginx
-   server {
-       listen 80;
-       server_name safevault.yourdomain.com;
-
-       location / {
-           proxy_pass http://localhost:3000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-
-       location /graphql {
-           proxy_pass http://localhost:8080;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-       }
-   }
-   ```
-
-3. **SSL Certificate Setup**
-   ```bash
-   # Using Let's Encrypt with Certbot
-   sudo certbot --nginx -d safevault.yourdomain.com
-   ```
-
-### Cloud Platform Deployments
-
-#### AWS Deployment
-
-- **ECS**: Use Docker containers with RDS PostgreSQL and S3 storage
-- **Elastic Beanstalk**: Deploy with Docker Compose
-- **EKS**: Kubernetes deployment with Helm charts
-
-#### Google Cloud Platform
-
-- **Cloud Run**: Serverless container deployment
-- **GKE**: Kubernetes with Cloud SQL and Cloud Storage
-- **Compute Engine**: VM-based deployment
-
-#### DigitalOcean
-
-- **App Platform**: PaaS deployment with managed database
-- **Droplets**: VPS deployment with Docker Compose
 
 ### Manual Production Build
 
@@ -355,17 +163,6 @@ We welcome contributions! Please follow these steps:
    ./safevault
    ```
 
-### Production Checklist
-
-- [ ] Configure production database with proper credentials
-- [ ] Set up SSL certificates for HTTPS
-- [ ] Configure file storage (S3/MinIO) with proper backup
-- [ ] Set up monitoring and logging
-- [ ] Configure email service for sharing notifications
-- [ ] Set up automated backups
-- [ ] Configure rate limiting and security headers
-- [ ] Test disaster recovery procedures
-
 ## Development
 
 ### Code Documentation
@@ -383,25 +180,6 @@ The codebase follows industry best practices for documentation:
 2. **Git Workflow**: Feature branches with pull requests
 3. **Testing**: Unit tests for business logic (implement as needed)
 4. **Documentation**: Update docs when adding new features
-
-## Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-3. **Make your changes and commit**
-   ```bash
-   git commit -m "Add: your feature description"
-   ```
-4. **Push to your fork**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-5. **Create a Pull Request**
 
 ### Development Guidelines
 
@@ -423,7 +201,6 @@ We welcome contributions! Please follow these steps:
 - **Authentication**: JWT tokens with configurable expiration
 - **Authorization**: Role-based access control for shared resources
 - **File Validation**: MIME type validation and file size limits
-- **SQL Injection**: Parameterized queries with GORM
 - **XSS Protection**: Content Security Policy headers
 - **Rate Limiting**: Implement rate limiting for production use
 - **HTTPS**: Always use HTTPS in production
