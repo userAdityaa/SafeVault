@@ -1305,7 +1305,18 @@ func (r *queryResolver) FileURL(ctx context.Context, fileID string, inline *bool
 	// First try to get the file URL if user owns it
 	fileURL, err := r.FileService.GetFileURL(ctx, userID, fid, in)
 	if err == nil {
-		fmt.Printf("DEBUG: User %s owns file %s, returning direct URL (no tracking)\n", userID, fid)
+		fmt.Printf("DEBUG: User %s owns file %s, returning direct URL with tracking\n", userID, fid)
+		// Record direct download for owner downloads (counts toward total but not shared/public)
+		if r.FileDownloadService != nil && r.FileDownloadService.DownloadRepo != nil {
+			go func() {
+				// Owner is downloading their own file
+				ownerID := userID
+				downloader := userID
+				if err := r.FileDownloadService.DownloadRepo.RecordDownload(context.Background(), fid, ownerID, &downloader, "direct", "", "GraphQL", "GraphQL-Client"); err != nil {
+					fmt.Printf("WARNING: Failed to record direct download: %v\n", err)
+				}
+			}()
+		}
 		return fileURL, nil
 	}
 
