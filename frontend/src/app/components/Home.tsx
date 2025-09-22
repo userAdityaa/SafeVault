@@ -208,6 +208,11 @@ export default function Home() {
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [dupModal, setDupModal] = useState<{ open: boolean; current?: { item: UploadItem; matchName: string; hash: string } } | null>(null);
+  const [folderConfirmModal, setFolderConfirmModal] = useState<{
+    open: boolean;
+    files?: File[];
+    folderName?: string;
+  } | null>(null);
   const [newlyAdded, setNewlyAdded] = useState<Set<string>>(new Set());
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [recentFilesLoading, setRecentFilesLoading] = useState(false);
@@ -310,6 +315,7 @@ export default function Home() {
 
     for (const item of newItems) {
       let allowDup = false;
+      let wasSkipped = false;
       try {
         const hash = await sha256(item.file);
         const query = `query Find($hash: String!) { findMyFileByHash(hash: $hash) { id file { originalName } } }`;
@@ -339,8 +345,8 @@ export default function Home() {
                 // Mark skipped by showing toast and removing with animation
                 toast.info(`Skipped ${item.file.name}`);
                 setTimeout(() => removeUploadItem(item.id), 1000);
-                // do not upload
-                throw new Error("skip");
+                wasSkipped = true;
+                resolve();
               }
             };
             window.addEventListener("dup:response", handler);
@@ -348,9 +354,10 @@ export default function Home() {
           setDupModal({ open: false });
         }
       } catch (e: unknown) {
-        const error = e as Error;
-        if (error?.message === "skip") continue;
+        // swallow and proceed; errors handled per item below
       }
+
+      if (wasSkipped) continue;
 
       setUploads((prev) => prev.map((u) => (u.id === item.id ? { ...u, status: "uploading", progress: 1 } : u)));
 
@@ -434,7 +441,8 @@ export default function Home() {
     console.log('Extracted folder name:', folderName);
     console.log('=== END FOLDER UPLOAD DEBUG ===');
     
-    await uploadFolder(fileArray, folderName);
+    // Open confirmation modal before uploading (slight delay to avoid overlap with any native prompts)
+    setTimeout(() => setFolderConfirmModal({ open: true, files: fileArray, folderName }), 150);
   };
 
   // Handle directory upload from drag and drop
@@ -469,7 +477,8 @@ export default function Home() {
     // Get folder name from the first file's path or use a default
     const folderName = allFiles[0]?.webkitRelativePath?.split('/')[0] || 'Untitled Folder';
     console.log('Extracted folder name:', folderName);
-    await uploadFolder(allFiles, folderName);
+    // Open confirmation modal before uploading (slight delay to avoid overlap with any native prompts)
+    setTimeout(() => setFolderConfirmModal({ open: true, files: allFiles, folderName }), 150);
   };
 
   // Recursively traverse directory entries
@@ -794,6 +803,45 @@ export default function Home() {
                 }}
               >
                 Continue Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Folder Upload Confirmation Modal */}
+      {folderConfirmModal?.open && folderConfirmModal.files && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Confirm folder upload</h3>
+            <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+              Upload folder <span className="font-medium break-words">{folderConfirmModal.folderName}</span> with {folderConfirmModal.files.length} files?
+            </p>
+            <div className="mt-4 max-h-40 overflow-auto bg-gray-50 rounded p-2 text-xs text-gray-600">
+              {folderConfirmModal.files.slice(0, 20).map((f, i) => (
+                <div key={i} className="truncate">{f.webkitRelativePath || f.name}</div>
+              ))}
+              {folderConfirmModal.files.length > 20 && (
+                <div className="text-gray-400">+ {folderConfirmModal.files.length - 20} more…</div>
+              )}
+            </div>
+            <div className="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end">
+              <button
+                className="px-3 sm:px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm order-2 sm:order-1"
+                onClick={() => setFolderConfirmModal({ open: false })}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-3 sm:px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm order-1 sm:order-2"
+                onClick={async () => {
+                  const files = folderConfirmModal.files!;
+                  const name = folderConfirmModal.folderName || 'Untitled Folder';
+                  setFolderConfirmModal({ open: false });
+                  await uploadFolder(files, name);
+                }}
+              >
+                Start Upload
               </button>
             </div>
           </div>

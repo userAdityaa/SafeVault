@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { gqlFetch } from './api';
 import { toast } from 'sonner';
 import { QUERY_ADMIN_FILE_DOWNLOAD_STATS } from './graphql';
-import { Download, Globe, Share, Calendar, FileText, User, TrendingUp, Eye } from 'lucide-react';
+import { Download, Globe, Share, Calendar, FileText, User, TrendingUp } from 'lucide-react';
 
 interface FileDownloadStats {
   fileId: string;
@@ -90,6 +90,32 @@ export default function AdminDownloadStats() {
     { totalDownloads: 0, sharedDownloads: 0, publicDownloads: 0, filesWithDownloads: 0 }
   );
 
+  // Derived analytics
+  const topFiles = [...stats]
+    .sort((a, b) => b.totalDownloads - a.totalDownloads)
+    .slice(0, 5);
+
+  const downloadsByOwner: Record<string, { owner: FileDownloadStats['owner']; count: number }> = {};
+  for (const s of stats) {
+    const key = s.owner.id;
+    if (!downloadsByOwner[key]) downloadsByOwner[key] = { owner: s.owner, count: 0 };
+    downloadsByOwner[key].count += s.totalDownloads;
+  }
+  const topOwners = Object.values(downloadsByOwner)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const nonSharedPublic = Math.max(
+    0,
+    totalStats.totalDownloads - totalStats.sharedDownloads - totalStats.publicDownloads
+  );
+  const donutParts = [
+    { label: 'Shared', value: totalStats.sharedDownloads, color: '#16a34a' },
+    { label: 'Public', value: totalStats.publicDownloads, color: '#7c3aed' },
+    { label: 'Direct', value: nonSharedPublic, color: '#2563eb' },
+  ];
+  const donutTotal = donutParts.reduce((s, p) => s + p.value, 0) || 1;
+
   if (loading) {
     return (
       <div className="p-8">
@@ -150,6 +176,100 @@ export default function AdminDownloadStats() {
           </div>
         </div>
       </div>
+
+      {/* Charts & Analytics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Donut: Shared vs Public vs Direct */}
+        <div className="bg-white rounded-lg border p-4">
+          <h3 className="font-semibold mb-2">Download Sources</h3>
+          <div className="flex items-center gap-4">
+            <svg width="140" height="140" viewBox="0 0 36 36">
+              {(() => {
+                let cum = 0;
+                const radius = 16;
+                const circumference = 2 * Math.PI * radius;
+                return (
+                  <g transform="rotate(-90 18 18)">
+                    <circle cx="18" cy="18" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="4" />
+                    {donutParts.map((part, idx) => {
+                      const frac = part.value / donutTotal;
+                      const dash = circumference * frac;
+                      const gap = circumference - dash;
+                      const circle = (
+                        <circle
+                          key={idx}
+                          cx="18"
+                          cy="18"
+                          r={radius}
+                          fill="none"
+                          stroke={part.color}
+                          strokeWidth="4"
+                          strokeDasharray={`${dash} ${gap}`}
+                          strokeDashoffset={circumference * cum}
+                        />
+                      );
+                      cum += frac;
+                      return circle;
+                    })}
+                  </g>
+                );
+              })()}
+            </svg>
+            <div className="text-sm space-y-1">
+              {donutParts.map((p) => (
+                <div key={p.label} className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: p.color }} />
+                  <span className="text-gray-600">{p.label}</span>
+                  <span className="ml-auto font-medium">
+                    {p.value.toLocaleString()} ({Math.round((p.value / donutTotal) * 100)}%)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bar: Top Files */}
+        <div className="bg-white rounded-lg border p-4 lg:col-span-2">
+          <h3 className="font-semibold mb-2">Top Files by Downloads</h3>
+          <div className="space-y-3">
+            {topFiles.map((f) => {
+              const pct = totalStats.totalDownloads
+                ? Math.min(100, Math.round((f.totalDownloads / totalStats.totalDownloads) * 100))
+                : 0;
+              return (
+                <div key={f.fileId}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="truncate max-w-[70%] text-gray-700">{f.file.originalName}</span>
+                    <span className="font-medium">{f.totalDownloads.toLocaleString()}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded">
+                    <div className="h-2 rounded bg-blue-600" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Top Owners */}
+      {topOwners.length > 0 && (
+        <div className="bg-white rounded-lg border p-4 mb-8">
+          <h3 className="font-semibold mb-3">Top Owners by Downloads</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {topOwners.map(({ owner, count }) => (
+              <div key={owner.id} className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-gray-400" />
+                  <span className="text-gray-700 truncate max-w-[220px]">{owner.name || owner.email}</span>
+                </div>
+                <span className="font-medium">{count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Sorting Controls */}
       <div className="flex gap-4 mb-6">

@@ -200,7 +200,10 @@ export default function Dashboard() {
                 <div className="absolute right-0 mt-2 w-48 bg-white border border-zinc-300 rounded-md shadow-lg z-50">
                   <div className="py-1">
                     <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                      <div className="font-medium">{user?.name || user?.email}</div>
+                      <div className="font-medium">
+                        {(user?.name || user?.email)?.slice(0, 18)}
+                        {(user?.name || user?.email)!.length > 18 ? "…" : ""}
+                      </div>
                       <div className="text-gray-500">
                         {(user?.email)?.slice(0, 20)}
                         {(user?.email && user.email.length > 20) ? "…" : ""}
