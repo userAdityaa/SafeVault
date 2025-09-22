@@ -1,5 +1,5 @@
 /**
- * Landing page component for the SnapVault application.
+ * Landing page component for the SafeVault application.
  * 
  * Displays the main marketing page with:
  * - Header with navigation and branding
@@ -29,10 +29,55 @@ export default function Home() {
           <div className="flex justify-between items-center py-6">
             {/* Logo */}
             <div className="flex items-center">
-              <Image src="/logo.png" alt="SnapVault" width={150} height={40} />
+              <Image src="/logo.png" alt="SafeVault" width={150} height={40} />
             </div>
             
-            {/* Navigation removed - not implemented */}
+            {/* Navigation */}
+            <nav className="hidden md:flex items-center space-x-12">
+              {/* About Us Dropdown */}
+              <div className="relative group">
+                <button className="flex items-center text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors">
+                  About Us
+                  <svg className="w-4 h-4 ml-1 text-gray-600 group-hover:text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transform group-hover:translate-y-0 translate-y-2 transition-all duration-300 z-10">
+                  <div className="p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Our Mission</h4>
+                    <p className="text-xs text-gray-600">
+                      At SafeVault, we are dedicated to revolutionizing file management with secure, efficient, and user-friendly solutions for enterprises worldwide.
+                    </p>
+                    <h4 className="text-sm font-semibold text-gray-900 mt-4 mb-2">Our Team</h4>
+                    <p className="text-xs text-gray-600">
+                      A passionate group of innovators with expertise in cloud storage, security, and enterprise software, committed to delivering excellence.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Solutions Dropdown */}
+              <div className="relative group">
+                <button className="flex items-center text-gray-600 hover:text-blue-600 text-sm font-medium transition-colors">
+                  Solutions
+                  <svg className="w-4 h-4 ml-1 text-gray-600 group-hover:text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transform group-hover:translate-y-0 translate-y-2 transition-all duration-300 z-10">
+                  <div className="p-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Enterprise File Management</h4>
+                    <p className="text-xs text-gray-600">
+                      Tailored for large organizations, our platform ensures secure storage, seamless collaboration, and compliance with industry standards.
+                    </p>
+                    <h4 className="text-sm font-semibold text-gray-900 mt-4 mb-2">Small Business Solutions</h4>
+                    <p className="text-xs text-gray-600">
+                      Affordable, scalable file management tools designed to streamline operations for growing businesses with robust security features.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </nav>
             
             {/* CTA Buttons */}
             <div className="flex items-center space-x-4">
@@ -115,18 +160,18 @@ export default function Home() {
                   </div>
 
                   {/* Stats cards */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-8">
                     <div className="bg-blue-100/80 p-4 rounded-xl shadow border border-blue-200 flex flex-col items-center">
-                      <div className="text-3xl font-extrabold text-blue-700 drop-shadow">1.2K</div>
-                      <div className="text-xs text-blue-700 font-semibold mt-1">Total Files</div>
+                      <div className="text-2xl font-extrabold text-blue-700 drop-shadow">1.2K</div>
+                      <div className="text-xs text-blue-700 font-semibold mt-1 text-center">Total Files</div>
                     </div>
                     <div className="bg-green-100/80 p-4 rounded-xl shadow border border-green-200 flex flex-col items-center">
-                      <div className="text-3xl font-extrabold text-green-700 drop-shadow">98%</div>
-                      <div className="text-xs text-green-700 font-semibold mt-1">Uptime</div>
+                      <div className="text-2xl font-extrabold text-green-700 drop-shadow">98%</div>
+                      <div className="text-xs text-green-700 font-semibold mt-1 text-center">Uptime</div>
                     </div>
                     <div className="bg-purple-100/80 p-4 rounded-xl shadow border border-purple-200 flex flex-col items-center">
-                      <div className="text-3xl font-extrabold text-purple-700 drop-shadow">15GB</div>
-                      <div className="text-xs text-purple-700 font-semibold mt-1">Storage Used</div>
+                      <div className="text-2xl font-extrabold text-purple-700 drop-shadow">15GB</div>
+                      <div className="text-xs text-purple-700 font-semibold mt-1 text-center">Storage Used</div>
                     </div>
                   </div>
 
