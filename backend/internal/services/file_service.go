@@ -112,7 +112,7 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			return nil, err
 		}
 
-		// Determine MIME type using declared type and filename extension
+		// Determine MIME type using declared type, extension, and content sniffing
 		clean := func(s string) string {
 			if s == "" {
 				return s
@@ -123,36 +123,66 @@ func (s *FileService) UploadFiles(ctx context.Context, userID uuid.UUID, uploads
 			return strings.TrimSpace(strings.ToLower(s))
 		}
 
+		// Declared type (from client/browser)
 		declaredBase := clean(up.ContentType)
+
+		// Extension-based type
 		extMime := ""
 		if ext := strings.ToLower(path.Ext(up.Filename)); ext != "" {
 			extMime = clean(mime.TypeByExtension(ext))
 		}
 
-		// Determine final MIME type: prioritize declared, fallback to extension-based
-		finalMimeType := declaredBase
+		// Sniffed type (actual file content)
+		peek := buf.Bytes()
+		if len(peek) > 512 {
+			peek = peek[:512]
+		}
+		sniffed := clean(http.DetectContentType(peek))
+
+		// Normalize a few common aliases inline
+		if declaredBase == "image/jpg" {
+			declaredBase = "image/jpeg"
+		}
+		if extMime == "image/jpg" {
+			extMime = "image/jpeg"
+		}
+		if sniffed == "image/jpg" {
+			sniffed = "image/jpeg"
+		}
+
+		// Allow-list of text-based extensions
+		textExts := map[string]bool{
+			".c": true, ".cpp": true, ".h": true, ".hpp": true,
+			".py": true, ".js": true, ".ts": true, ".java": true,
+			".txt": true, ".md": true, ".go": true, ".rs": true,
+		}
+
+		// Validation: if not a text file, sniffed must agree with extension
+		ext := strings.ToLower(path.Ext(up.Filename))
+		if extMime != "" && sniffed != "" && sniffed != "application/octet-stream" {
+			if sniffed == "text/plain" && textExts[ext] {
+				// treat as valid: cpp, py, etc.
+			} else if extMime != sniffed {
+				return nil, fmt.Errorf("file content (%s) does not match file extension (%s)", sniffed, extMime)
+			}
+		}
+
+		// Decide final type: prefer sniffed > extension > declared
+		finalMimeType := sniffed
 		if finalMimeType == "" || finalMimeType == "application/octet-stream" {
 			if extMime != "" {
 				finalMimeType = extMime
+			} else if declaredBase != "" {
+				finalMimeType = declaredBase
 			} else {
-				// Only use http.DetectContentType as last resort for storage purposes
-				peek := buf.Bytes()
-				if len(peek) > 512 {
-					peek = peek[:512]
-				}
-				detected := http.DetectContentType(peek)
-				finalMimeType = clean(detected)
+				finalMimeType = "application/octet-stream"
 			}
 		}
 
 		// Basic validation: if both declared and extension exist, ensure they're compatible
 		if declaredBase != "" && extMime != "" && declaredBase != "application/octet-stream" {
 			// Allow some common compatible combinations
-			compatible := declaredBase == extMime ||
-				(declaredBase == "text/csv" && extMime == "text/plain") ||
-				(declaredBase == "text/plain" && extMime == "text/csv") ||
-				(strings.HasPrefix(declaredBase, "text/") && strings.HasPrefix(extMime, "text/"))
-
+			compatible := declaredBase == extMime
 			if !compatible {
 				return nil, fmt.Errorf("declared MIME type (%s) does not match file extension (%s)", declaredBase, extMime)
 			}
